@@ -32,6 +32,7 @@ export * from "./Select";
 export * from "./SelectedPlayerContext";
 export * from "./Slider";
 export * from "./Spinner";
+export * from "./SpeakerSettingsBottomSheet";
 export * from "./SubForm";
 export * from "./TinyMediaPlayer";
 export * from "./VirtualList";

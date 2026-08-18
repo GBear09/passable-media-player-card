@@ -1,13 +1,12 @@
-import { useContext } from "preact/hooks";
+import { useContext, useMemo } from "preact/hooks";
 import { css } from "@emotion/react";
-import { IconButton } from "@components";
+import { IconButton, useHass } from "@components";
 import { CardContext, CardContextType } from "@components/CardContext";
 import { InteractionConfig, MediocreMultiMediaPlayerCardConfig } from "@types";
 import { NavigationRoute } from "@components/MediocreLargeMultiMediaPlayerCard";
-import { theme } from "@constants";
 import { useActionProps, useCanDisplayQueue } from "@hooks";
 import { memo } from "preact/compat";
-import { getHasMediaBrowser, getHasSearch, isDarkMode } from "@utils";
+import { getHasMediaBrowser, getHasSearch } from "@utils";
 import { useSelectedPlayer } from "@components/SelectedPlayerContext";
 
 const styles = {
@@ -35,15 +34,17 @@ export type FooterActionsProps = {
   setNavigationRoute: (route: NavigationRoute) => void;
   navigationRoute: NavigationRoute;
   desktopMode?: boolean;
+  onOpenSettings?: () => void;
 };
 
 export const FooterActions = memo<FooterActionsProps>(
-  ({ setNavigationRoute, navigationRoute, desktopMode }) => {
+  ({ setNavigationRoute, navigationRoute, desktopMode, onOpenSettings }) => {
     const { rootElement, config } =
       useContext<CardContextType<MediocreMultiMediaPlayerCardConfig>>(
         CardContext
       );
     const { selectedPlayer } = useSelectedPlayer();
+    const hass = useHass();
 
     const {
       entity_id,
@@ -54,9 +55,38 @@ export const FooterActions = memo<FooterActionsProps>(
       lms_entity_id,
     } = selectedPlayer!;
 
+    const baseName = entity_id.replace("media_player.", "").replace(/_ma$/, "");
+
     const hasSearch = getHasSearch(search, ma_entity_id);
     const hasMediaBrowser = getHasMediaBrowser(media_browser);
     const hasQueue = useCanDisplayQueue({ ma_entity_id, lms_entity_id });
+
+    const hasNativeSettings = useMemo(() => {
+      if (!hass?.states || !baseName) return false;
+      const pattern = new RegExp(`^(number|switch|select)\\.${baseName}_`, "i");
+      return Object.keys(hass.states).some(k => pattern.test(k));
+    }, [hass?.states, baseName]);
+
+    const settingsCustomButton = useMemo(() => {
+      return custom_buttons?.find(
+        b => b.name?.toLowerCase() === "settings" || b.icon === "mdi:tune"
+      );
+    }, [custom_buttons]);
+
+    const nonSettingsCustomButtons = useMemo(() => {
+      return (
+        custom_buttons?.filter(
+          b => b.name?.toLowerCase() !== "settings" && b.icon !== "mdi:tune"
+        ) ?? []
+      );
+    }, [custom_buttons]);
+
+    const showSettingsButton = !!settingsCustomButton || hasNativeSettings;
+
+    const hideActionsTab =
+      config.options?.hide_actions_tab ??
+      config.options?.hide_shortcuts_tab ??
+      nonSettingsCustomButtons.length === 0;
 
     if (config.size && config.size !== "large") return null;
 
@@ -96,19 +126,28 @@ export const FooterActions = memo<FooterActionsProps>(
             selected={navigationRoute === "queue"}
           />
         )}
-        {custom_buttons && custom_buttons.length === 1 ? (
+        {showSettingsButton && (
+          <IconButton
+            size="small"
+            icon={"mdi:tune"}
+            onClick={onOpenSettings}
+          />
+        )}
+        {nonSettingsCustomButtons.length === 1 ? (
           <CustomButton
-            button={custom_buttons[0]}
+            button={nonSettingsCustomButtons[0]}
             rootElement={rootElement}
             entityId={entity_id}
           />
         ) : null}
-        <IconButton
-          size="small"
-          icon={"mdi:dots-horizontal"}
-          onClick={() => setNavigationRoute("custom-buttons")}
-          selected={navigationRoute === "custom-buttons"}
-        />
+        {!hideActionsTab && (
+          <IconButton
+            size="small"
+            icon={"mdi:dots-horizontal"}
+            onClick={() => setNavigationRoute("custom-buttons")}
+            selected={navigationRoute === "custom-buttons"}
+          />
+        )}
         <IconButton
           size="small"
           icon={"mdi:speaker-multiple"}
@@ -149,3 +188,4 @@ const CustomButton = ({
     />
   );
 };
+

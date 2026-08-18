@@ -22,6 +22,7 @@ import { MassiveViewView } from "./components/MassiveView";
 import { AdditionalActionsView } from "./components/AdditionalActionsView";
 import { QueueView } from "./components/QueueView";
 import { useSelectedPlayer } from "@components/SelectedPlayerContext";
+import { SpeakerSettingsBottomSheet } from "@components";
 
 export type NavigationRoute =
   | "search"
@@ -159,6 +160,7 @@ export const MediocreLargeMultiMediaPlayerCard = ({
   const [navigationRoute, setNavigationRoute] = useState<NavigationRoute>(
     defaultNavigationRoute
   );
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const [cardSizeRef, { height: cardHeight, width: cardWidth }] =
     useMeasure<HTMLDivElement>();
@@ -273,8 +275,13 @@ export const MediocreLargeMultiMediaPlayerCard = ({
           setNavigationRoute={setNavigationRoute}
           navigationRoute={navigationRoute}
           desktopMode={desktopMode}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
       </div>
+      <SpeakerSettingsBottomSheet
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </ArtworkColorWrap>
   );
 };

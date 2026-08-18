@@ -1,14 +1,10 @@
-import { IconButton, usePlayer } from "@components";
+import { IconButton, useHass, usePlayer } from "@components";
 import { useSupportedFeatures } from "@hooks";
 import { css } from "@emotion/react";
 import { usePlayerActions } from "@hooks/usePlayerActions";
-import { useMemo } from "preact/hooks";
-import { startRadioMix } from "@utils";
 import { useSelectedPlayer } from "@components/SelectedPlayerContext";
-import {
-  OverlayMenu,
-  OverlayMenuItem,
-} from "@components/OverlayMenu/OverlayMenu";
+import { getHasMassFeatures } from "@utils";
+import { MediaPlayerEntity } from "@types";
 
 const styles = {
   root: css({
@@ -17,7 +13,7 @@ const styles = {
     alignItems: "center",
     justifyContent: "space-around",
     width: "100%",
-    maxWidth: "480px",
+    maxWidth: "440px",
     paddingLeft: "var(--mmpc-extra-horizontal-padding, 0px)",
     paddingRight: "var(--mmpc-extra-horizontal-padding, 0px)",
   }),
@@ -27,18 +23,27 @@ export const PlaybackControls = () => {
   const { selectedPlayer } = useSelectedPlayer();
   const player = usePlayer();
   const {
-    attributes: {
-      shuffle,
-      repeat,
-      media_title: mediaTitle,
-      media_artist: mediaArtist,
-      media_album_name: mediaAlbum,
-    },
+    attributes: { shuffle, repeat },
     state,
     entity_id: entityId,
   } = player;
 
   const maEntityId = selectedPlayer?.ma_entity_id;
+  const isMass = maEntityId ? getHasMassFeatures(entityId, maEntityId) : false;
+  const hass = useHass();
+  const maState = maEntityId
+    ? (hass?.states?.[maEntityId] as MediaPlayerEntity | undefined)
+    : undefined;
+
+  const effectiveShuffle =
+    isMass && maState?.attributes?.shuffle !== undefined
+      ? maState.attributes.shuffle
+      : shuffle;
+  const effectiveRepeat =
+    isMass && maState?.attributes?.repeat !== undefined
+      ? maState.attributes.repeat
+      : repeat;
+
   const playing = state === "playing";
 
   const {
@@ -60,40 +65,15 @@ export const PlaybackControls = () => {
     stop,
   } = usePlayerActions();
 
-  const radioMixMenuItems: OverlayMenuItem[] = useMemo(() => {
-    const items: OverlayMenuItem[] = [];
-    if (mediaTitle) {
-      items.push({
-        label: `Song Radio (${mediaTitle})`,
-        icon: "mdi:music-note",
-        onClick: () => startRadioMix(entityId, maEntityId, mediaTitle, "track"),
-      });
-    }
-    if (mediaArtist) {
-      items.push({
-        label: `Artist Radio (${mediaArtist})`,
-        icon: "mdi:account-music",
-        onClick: () =>
-          startRadioMix(entityId, maEntityId, mediaArtist, "artist"),
-      });
-    }
-    if (mediaAlbum) {
-      items.push({
-        label: `Album Radio (${mediaAlbum})`,
-        icon: "mdi:album",
-        onClick: () => startRadioMix(entityId, maEntityId, mediaAlbum, "album"),
-      });
-    }
-    return items;
-  }, [mediaTitle, mediaArtist, mediaAlbum, entityId, maEntityId]);
-
   return (
     <div css={styles.root}>
       {supportsShuffle && (
         <IconButton
           size="small"
           onClick={toggleShuffle}
-          icon={shuffle ? "mdi:shuffle-variant" : "mdi:shuffle-disabled"}
+          icon={
+            effectiveShuffle ? "mdi:shuffle-variant" : "mdi:shuffle-disabled"
+          }
         />
       )}
       {supportPreviousTrack && (
@@ -126,21 +106,12 @@ export const PlaybackControls = () => {
           size="small"
           onClick={toggleRepeat}
           icon={
-            repeat === "one"
+            effectiveRepeat === "one"
               ? "mdi:repeat-once"
-              : repeat === "all"
+              : effectiveRepeat === "all"
                 ? "mdi:repeat"
                 : "mdi:repeat-off"
           }
-        />
-      )}
-      {radioMixMenuItems.length > 0 && (
-        <OverlayMenu
-          menuItems={radioMixMenuItems}
-          side="top"
-          renderTrigger={triggerProps => (
-            <IconButton size="small" icon="mdi:radio-tower" {...triggerProps} />
-          )}
         />
       )}
     </div>

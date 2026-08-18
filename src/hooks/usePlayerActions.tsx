@@ -1,14 +1,37 @@
-import { usePlayer } from "@components";
-import { getHass } from "@utils";
+import { useHass, usePlayer } from "@components";
+import { getHass, getHasMassFeatures } from "@utils";
 import { useSupportedFeatures } from "@hooks/useSupportedFeatures";
-import { useCallback, useMemo } from "preact/hooks";
+import { useCallback, useContext, useMemo } from "preact/hooks";
+import { SelectedPlayerContext } from "@components/SelectedPlayerContext";
+import { MediaPlayerEntity } from "@types";
 
 export const usePlayerActions = () => {
+  const player = usePlayer();
   const {
     entity_id,
     state,
     attributes: { shuffle, repeat },
-  } = usePlayer();
+  } = player;
+
+  const selectedPlayerContext = useContext(SelectedPlayerContext);
+  const selectedPlayer = selectedPlayerContext?.selectedPlayer;
+  const maEntityId = selectedPlayer?.ma_entity_id;
+
+  const hass = useHass();
+  const isMass = maEntityId ? getHasMassFeatures(entity_id, maEntityId) : false;
+  const maState = maEntityId
+    ? (hass?.states?.[maEntityId] as MediaPlayerEntity | undefined)
+    : undefined;
+
+  const queueEntityId = isMass && maEntityId ? maEntityId : entity_id;
+  const effectiveShuffle =
+    isMass && maState?.attributes?.shuffle !== undefined
+      ? maState.attributes.shuffle
+      : shuffle;
+  const effectiveRepeat =
+    isMass && maState?.attributes?.repeat !== undefined
+      ? maState.attributes.repeat
+      : repeat;
 
   const { supportsPause, supportsStop } = useSupportedFeatures();
 
@@ -34,31 +57,35 @@ export const usePlayerActions = () => {
 
   const nextTrack = useCallback(() => {
     getHass().callService("media_player", "media_next_track", {
-      entity_id,
+      entity_id: queueEntityId,
     });
-  }, [entity_id]);
+  }, [queueEntityId]);
 
   const previousTrack = useCallback(() => {
     getHass().callService("media_player", "media_previous_track", {
-      entity_id,
+      entity_id: queueEntityId,
     });
-  }, [entity_id]);
+  }, [queueEntityId]);
 
   const toggleShuffle = useCallback(() => {
     getHass().callService("media_player", "shuffle_set", {
-      entity_id,
-      shuffle: !shuffle,
+      entity_id: queueEntityId,
+      shuffle: !effectiveShuffle,
     });
-  }, [entity_id, shuffle]);
+  }, [queueEntityId, effectiveShuffle]);
 
   const toggleRepeat = useCallback(() => {
     const newRepeat =
-      repeat === "off" ? "one" : repeat === "one" ? "all" : "off";
+      effectiveRepeat === "off"
+        ? "one"
+        : effectiveRepeat === "one"
+          ? "all"
+          : "off";
     getHass().callService("media_player", "repeat_set", {
-      entity_id,
+      entity_id: queueEntityId,
       repeat: newRepeat,
     });
-  }, [entity_id, repeat]);
+  }, [queueEntityId, effectiveRepeat]);
 
   const togglePower = useCallback(() => {
     getHass().callService("media_player", "toggle", {

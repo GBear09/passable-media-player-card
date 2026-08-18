@@ -1,7 +1,10 @@
-import { IconButton, usePlayer } from "@components";
+import { IconButton, useHass, usePlayer } from "@components";
 import { useSupportedFeatures } from "@hooks";
 import { css } from "@emotion/react";
 import { usePlayerActions } from "@hooks/usePlayerActions";
+import { useSelectedPlayer } from "@components/SelectedPlayerContext";
+import { getHasMassFeatures } from "@utils";
+import { MediaPlayerEntity } from "@types";
 
 const styles = {
   root: css({
@@ -29,10 +32,29 @@ const styles = {
 };
 
 export const PlaybackControls = () => {
+  const { selectedPlayer } = useSelectedPlayer();
+  const player = usePlayer();
   const {
     attributes: { shuffle, repeat },
     state,
-  } = usePlayer();
+    entity_id: entityId,
+  } = player;
+
+  const maEntityId = selectedPlayer?.ma_entity_id;
+  const isMass = maEntityId ? getHasMassFeatures(entityId, maEntityId) : false;
+  const hass = useHass();
+  const maState = maEntityId
+    ? (hass?.states?.[maEntityId] as MediaPlayerEntity | undefined)
+    : undefined;
+
+  const effectiveShuffle =
+    isMass && maState?.attributes?.shuffle !== undefined
+      ? maState.attributes.shuffle
+      : shuffle;
+  const effectiveRepeat =
+    isMass && maState?.attributes?.repeat !== undefined
+      ? maState.attributes.repeat
+      : repeat;
 
   const playing = state === "playing";
 
@@ -62,11 +84,13 @@ export const PlaybackControls = () => {
           id="mmpc-compact-shuffle-toggle"
           css={[
             styles.shuffleButton,
-            ...(!shuffle ? [styles.buttonMuted] : []),
+            ...(!effectiveShuffle ? [styles.buttonMuted] : []),
           ]}
           size="x-small"
           onClick={toggleShuffle}
-          icon={shuffle ? "mdi:shuffle-variant" : "mdi:shuffle-disabled"}
+          icon={
+            effectiveShuffle ? "mdi:shuffle-variant" : "mdi:shuffle-disabled"
+          }
         />
       )}
       {!!supportPreviousTrack && (
@@ -111,14 +135,14 @@ export const PlaybackControls = () => {
           id="mmpc-compact-repeat-toggle"
           css={[
             styles.repeatButton,
-            ...(repeat === "off" ? [styles.buttonMuted] : []),
+            ...(effectiveRepeat === "off" ? [styles.buttonMuted] : []),
           ]}
           size="x-small"
           onClick={toggleRepeat}
           icon={
-            repeat === "one"
+            effectiveRepeat === "one"
               ? "mdi:repeat-once"
-              : repeat === "all"
+              : effectiveRepeat === "all"
                 ? "mdi:repeat"
                 : "mdi:repeat-off"
           }

@@ -170,7 +170,12 @@ export const AdditionalActionsView = memo(() => {
         label: `Song Radio (${mediaTitle})`,
         icon: "mdi:music-note",
         onClick: () =>
-          startRadioMix(entity_id, ma_entity_id, mediaTitle, "track"),
+          startRadioMix(
+            entity_id,
+            ma_entity_id ?? undefined,
+            mediaTitle,
+            "track"
+          ),
       });
     }
     if (mediaArtist) {
@@ -178,7 +183,12 @@ export const AdditionalActionsView = memo(() => {
         label: `Artist Radio (${mediaArtist})`,
         icon: "mdi:account-music",
         onClick: () =>
-          startRadioMix(entity_id, ma_entity_id, mediaArtist, "artist"),
+          startRadioMix(
+            entity_id,
+            ma_entity_id ?? undefined,
+            mediaArtist,
+            "artist"
+          ),
       });
     }
     if (mediaAlbum) {
@@ -186,7 +196,12 @@ export const AdditionalActionsView = memo(() => {
         label: `Album Radio (${mediaAlbum})`,
         icon: "mdi:album",
         onClick: () =>
-          startRadioMix(entity_id, ma_entity_id, mediaAlbum, "album"),
+          startRadioMix(
+            entity_id,
+            ma_entity_id ?? undefined,
+            mediaAlbum,
+            "album"
+          ),
       });
     }
 

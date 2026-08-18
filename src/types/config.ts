@@ -111,6 +111,8 @@ export const commonMediaPlayerCardOptions = type({
   "show_volume_step_buttons?": "boolean", // Show volume step buttons + - on volume sliders
   "use_volume_up_down_for_step_buttons?": "boolean", // Use volume_up and volume_down services for step buttons instead of setting volume using set_volume. This breaks volume sync when step buttons are used.
   "use_experimental_lms_media_browser?": "boolean", // Use the experimental LMS media browser instead of the default one when an LMS entity is used and lyrion_cli integration is present.
+  "hide_actions_tab?": "boolean", // Hide the 3-dots actions/shortcuts tab
+  "hide_shortcuts_tab?": "boolean", // Alias for hide_actions_tab
 });
 
 export const commonMediaPlayerCardSchema = type({
@@ -132,6 +134,8 @@ export const MediocreMultiMediaPlayerCardConfigSchema =
       "options?": commonMediaPlayerCardOptions.and({
         "hide_selected_player_header?": "boolean", // Hide the header of the selected player in the massive view
         "transparent_background_on_home?": "boolean", // Makes the background transparent when the showing the massive player
+        "hide_actions_tab?": "boolean", // Hide the 3-dots actions/shortcuts tab
+        "hide_shortcuts_tab?": "boolean", // Alias for hide_actions_tab
         "default_tab?":
           "'massive'|'search'|'media-browser'|'speaker-grouping'|'custom-buttons'|'queue'", // The tab to show by default when the card loads
       }),
