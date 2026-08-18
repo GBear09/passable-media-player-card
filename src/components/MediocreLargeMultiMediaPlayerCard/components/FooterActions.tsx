@@ -127,11 +127,7 @@ export const FooterActions = memo<FooterActionsProps>(
           />
         )}
         {showSettingsButton && (
-          <IconButton
-            size="small"
-            icon={"mdi:tune"}
-            onClick={onOpenSettings}
-          />
+          <IconButton size="small" icon={"mdi:tune"} onClick={onOpenSettings} />
         )}
         {nonSettingsCustomButtons.length === 1 ? (
           <CustomButton
@@ -188,4 +184,3 @@ const CustomButton = ({
     />
   );
 };
-

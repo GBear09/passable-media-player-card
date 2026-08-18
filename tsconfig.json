@@ -34,5 +34,9 @@
     }
   },
   "exclude": ["dist", "**/*.mjs", "passable-media-player-card.js"],
-  "include": ["node_modules/vite/client.d.ts", "src/types/emotion.d.ts", "src/**/*"]
+  "include": [
+    "node_modules/vite/client.d.ts",
+    "src/types/emotion.d.ts",
+    "src/**/*"
+  ]
 }
