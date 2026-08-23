@@ -6,7 +6,9 @@ class MediocreMediaPlayerCardEditorWrapper extends CardEditorWrapper<MediocreMed
   Card = MediocreMediaPlayerCardEditor;
 }
 
-customElements.define(
-  import.meta.env.VITE_MEDIA_PLAYER_CARD_EDITOR,
-  MediocreMediaPlayerCardEditorWrapper
-);
+if (!customElements.get(import.meta.env.VITE_MEDIA_PLAYER_CARD_EDITOR)) {
+  customElements.define(
+    import.meta.env.VITE_MEDIA_PLAYER_CARD_EDITOR,
+    MediocreMediaPlayerCardEditorWrapper
+  );
+}

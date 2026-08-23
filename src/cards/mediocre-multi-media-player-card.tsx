@@ -42,6 +42,28 @@ class MediocreMultiMediaPlayerCardWrapper extends CardWrapper<MediocreMultiMedia
         if (getDidMediaPlayerUpdate(prevPlayerState, currPlayerState)) {
           return true;
         }
+        if (player.ma_entity_id) {
+          const prevMaState = prevHass.states?.[
+            player.ma_entity_id
+          ] as MediaPlayerEntity;
+          const currMaState = hass.states?.[
+            player.ma_entity_id
+          ] as MediaPlayerEntity;
+          if (getDidMediaPlayerUpdate(prevMaState, currMaState)) {
+            return true;
+          }
+        }
+        if (player.lms_entity_id) {
+          const prevLmsState = prevHass.states?.[
+            player.lms_entity_id
+          ] as MediaPlayerEntity;
+          const currLmsState = hass.states?.[
+            player.lms_entity_id
+          ] as MediaPlayerEntity;
+          if (getDidMediaPlayerUpdate(prevLmsState, currLmsState)) {
+            return true;
+          }
+        }
         if (player.speaker_group_entity_id) {
           const prevGroupState = prevHass.states?.[
             player.speaker_group_entity_id
@@ -106,7 +128,7 @@ if (!customElements.get(import.meta.env.VITE_MULTI_MEDIA_PLAYER_CARD)) {
 if (!customElements.get("mediocre-multi-media-player-card")) {
   customElements.define(
     "mediocre-multi-media-player-card",
-    MediocreMultiMediaPlayerCardWrapper
+    class extends MediocreMultiMediaPlayerCardWrapper {}
   );
 }
 

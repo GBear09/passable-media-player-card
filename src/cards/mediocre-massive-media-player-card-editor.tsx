@@ -7,7 +7,9 @@ class MediocreMassiveMediaPlayerCardEditorWrapper extends CardEditorWrapper<Medi
   extraProps = { isMassive: true, className: undefined };
 }
 
-customElements.define(
-  import.meta.env.VITE_MASSIVE_MEDIA_PLAYER_CARD_EDITOR,
-  MediocreMassiveMediaPlayerCardEditorWrapper
-);
+if (!customElements.get(import.meta.env.VITE_MASSIVE_MEDIA_PLAYER_CARD_EDITOR)) {
+  customElements.define(
+    import.meta.env.VITE_MASSIVE_MEDIA_PLAYER_CARD_EDITOR,
+    MediocreMassiveMediaPlayerCardEditorWrapper
+  );
+}

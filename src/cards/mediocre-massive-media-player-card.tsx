@@ -25,6 +25,28 @@ class MediocreMassiveMediaPlayerCardWrapper extends CardWrapper<MediocreMassiveM
       return true;
     }
 
+    // Check if MA entity changed (if configured)
+    if (
+      this.config.ma_entity_id &&
+      getDidMediaPlayerUpdate(
+        prevHass.states[this.config.ma_entity_id] as MediaPlayerEntity,
+        hass.states[this.config.ma_entity_id] as MediaPlayerEntity
+      )
+    ) {
+      return true;
+    }
+
+    // Check if LMS entity changed (if configured)
+    if (
+      this.config.lms_entity_id &&
+      getDidMediaPlayerUpdate(
+        prevHass.states[this.config.lms_entity_id] as MediaPlayerEntity,
+        hass.states[this.config.lms_entity_id] as MediaPlayerEntity
+      )
+    ) {
+      return true;
+    }
+
     // Check if speaker group entity changed (if configured)
     if (
       this.config.speaker_group?.entity_id &&
@@ -95,7 +117,7 @@ if (!customElements.get(import.meta.env.VITE_MASSIVE_MEDIA_PLAYER_CARD)) {
 if (!customElements.get("mediocre-massive-media-player-card")) {
   customElements.define(
     "mediocre-massive-media-player-card",
-    MediocreMassiveMediaPlayerCardWrapper
+    class extends MediocreMassiveMediaPlayerCardWrapper {}
   );
 }
 

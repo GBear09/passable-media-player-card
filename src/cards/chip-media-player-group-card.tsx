@@ -56,7 +56,7 @@ if (!customElements.get(import.meta.env.VITE_CHIP_MEDIA_PLAYER_GROUP_CARD)) {
 if (!customElements.get("mediocre-chip-media-player-group-card")) {
   customElements.define(
     "mediocre-chip-media-player-group-card",
-    MediocreChipMediaPlayerGroupCardWrapper
+    class extends MediocreChipMediaPlayerGroupCardWrapper {}
   );
 }
 
