@@ -6,12 +6,14 @@ import { getHass } from "@utils/getHass";
  * @param maEntityId Optional specific Music Assistant entity ID.
  * @param mediaId The title, artist name, album name, or URI to seed the radio mix.
  * @param mediaType The type of seed: "track", "artist", or "album".
+ * @param enqueue Queue behavior ("replace_next", "add", "next", "replace", "play"). Defaults to "replace_next".
  */
 export async function startRadioMix(
   targetEntityId: string,
   maEntityId: string | undefined,
   mediaId: string,
-  mediaType: "track" | "artist" | "album"
+  mediaType: "track" | "artist" | "album",
+  enqueue: "replace_next" | "add" | "next" | "replace" | "play" = "replace_next"
 ): Promise<void> {
   const hass = getHass();
   if (!hass) throw new Error("hass object not available");
@@ -25,7 +27,7 @@ export async function startRadioMix(
       media_id: mediaId,
       media_type: mediaType,
       radio_mode: true,
-      enqueue: "replace",
+      enqueue,
     },
     { entity_id: entityId }
   );
