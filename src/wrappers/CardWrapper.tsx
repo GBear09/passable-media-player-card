@@ -72,6 +72,10 @@ export class CardWrapper<
     }
   }
 
+  disconnectedCallback() {
+    render(null, this);
+  }
+
   getCardSize() {
     return 1;
   }

@@ -18,6 +18,10 @@ export class CardEditorWrapper<T> extends HTMLElement {
   extraProps: { [key: string]: unknown } = {};
   _hass: HomeAssistant | null = null;
 
+  disconnectedCallback() {
+    render(null, this);
+  }
+
   set hass(hass: HomeAssistant) {
     this._hass = hass;
   }
