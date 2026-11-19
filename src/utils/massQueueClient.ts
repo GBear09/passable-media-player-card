@@ -249,6 +249,7 @@ export async function getConfigEntryId(
 export function clearMassConfigEntryCache(): void {
   cachedConfigEntries = null;
   inFlightConfigEntries = null;
+  bulkPlayGeneration.clear();
 }
 
 /**
@@ -679,6 +680,201 @@ export async function playMassMedia(
     },
     { entity_id: maEntityId }
   );
+}
+
+export type SeedTrackMatcher = {
+  trackUri?: string | null;
+  alternateTrackUri?: string | null;
+  title?: string | null;
+  artist?: string | null;
+};
+
+function normalizeTrackText(value: string | null | undefined): string {
+  if (!value) return "";
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function extractPrimaryArtist(value: string | null | undefined): string {
+  const normalized = normalizeTrackText(value);
+  if (!normalized) return "";
+  const parts = normalized.split(/\s*(?:,|&|;|feat\.?|ft\.?)\s*/i);
+  return parts.find(part => part.length > 0) ?? "";
+}
+
+/**
+ * Removes the seed track from a similar-tracks list using either URI match or normalized title + artist match.
+ */
+export function filterOutSeedTrack(
+  tracks: MassTrackItem[],
+  seed: SeedTrackMatcher
+): MassTrackItem[] {
+  const seedUris = new Set(
+    [seed.trackUri, seed.alternateTrackUri]
+      .map(uri => uri?.trim().toLowerCase() ?? "")
+      .filter(Boolean)
+  );
+  const seedTitle = normalizeTrackText(seed.title);
+  const seedArtist = normalizeTrackText(seed.artist);
+  const seedPrimaryArtist = extractPrimaryArtist(seed.artist);
+
+  return tracks.filter(track => {
+    const trackUri = track.media_content_id?.trim().toLowerCase();
+    if (trackUri && seedUris.has(trackUri)) {
+      return false;
+    }
+
+    if (seedTitle.length > 0 && seedArtist.length > 0) {
+      if (normalizeTrackText(track.media_title) === seedTitle) {
+        const trackArtist = normalizeTrackText(track.media_artist);
+        const trackPrimaryArtist = extractPrimaryArtist(track.media_artist);
+        if (
+          trackArtist === seedArtist ||
+          (seedPrimaryArtist.length > 0 &&
+            trackPrimaryArtist === seedPrimaryArtist)
+        ) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  });
+}
+
+export const BULK_ENQUEUE_BATCH_SIZE = 5;
+
+export type PlayMassTracksProgressiveOptions = {
+  maEntityId: string;
+  uris: string[];
+  mode: "play" | "add";
+  batchSize?: number;
+  onFirstBatchReady?: (info: {
+    startedCount: number;
+    remainingCount: number;
+    totalCount: number;
+  }) => void;
+  onProgress?: (info: { queuedCount: number; totalCount: number }) => void;
+};
+
+export type PlayMassTracksProgressiveResult = {
+  totalCount: number;
+  queuedCount: number;
+  failedCount: number;
+  cancelled: boolean;
+};
+
+const bulkPlayGeneration = new Map<string, number>();
+
+/**
+ * Cancels any in-flight progressive bulk queue operation for the given MA player entity.
+ */
+export function cancelBulkPlayForEntity(maEntityId: string): void {
+  const nextGen = (bulkPlayGeneration.get(maEntityId) ?? 0) + 1;
+  bulkPlayGeneration.set(maEntityId, nextGen);
+}
+
+/**
+ * Starts playback or queues multiple track URIs in small sequential batches so audio starts quickly
+ * and large lists do not hit Music Assistant's per-request resolve timeout.
+ */
+export async function playMassTracksProgressive({
+  maEntityId,
+  uris,
+  mode,
+  batchSize,
+  onFirstBatchReady,
+  onProgress,
+}: PlayMassTracksProgressiveOptions): Promise<PlayMassTracksProgressiveResult> {
+  const uniqueUris = Array.from(
+    new Set(uris.map(uri => uri.trim()).filter(Boolean))
+  );
+  if (uniqueUris.length === 0) {
+    return {
+      totalCount: 0,
+      queuedCount: 0,
+      failedCount: 0,
+      cancelled: false,
+    };
+  }
+
+  const chunkSize = Math.max(
+    1,
+    Math.floor(batchSize ?? BULK_ENQUEUE_BATCH_SIZE)
+  );
+  const gen = (bulkPlayGeneration.get(maEntityId) ?? 0) + 1;
+  bulkPlayGeneration.set(maEntityId, gen);
+  const isCancelled = () => bulkPlayGeneration.get(maEntityId) !== gen;
+
+  const firstBatch =
+    mode === "play" ? [uniqueUris[0]] : uniqueUris.slice(0, chunkSize);
+  const remaining =
+    mode === "play" ? uniqueUris.slice(1) : uniqueUris.slice(chunkSize);
+
+  if (mode === "play") {
+    // Replace queue on track 1 so remaining chunks appended via "add" play next in exact order.
+    await playMassMedia(maEntityId, uniqueUris[0], "track", "replace");
+  } else {
+    await playMassMedia(
+      maEntityId,
+      firstBatch.length === 1 ? firstBatch[0] : firstBatch,
+      "track",
+      "add"
+    );
+  }
+
+  let queuedCount = firstBatch.length;
+  let failedCount = 0;
+
+  if (isCancelled()) {
+    return {
+      totalCount: uniqueUris.length,
+      queuedCount,
+      failedCount,
+      cancelled: true,
+    };
+  }
+
+  onFirstBatchReady?.({
+    startedCount: firstBatch.length,
+    remainingCount: remaining.length,
+    totalCount: uniqueUris.length,
+  });
+  onProgress?.({ queuedCount, totalCount: uniqueUris.length });
+
+  for (let i = 0; i < remaining.length; i += chunkSize) {
+    if (isCancelled()) {
+      return {
+        totalCount: uniqueUris.length,
+        queuedCount,
+        failedCount,
+        cancelled: true,
+      };
+    }
+
+    const chunk = remaining.slice(i, i + chunkSize);
+    try {
+      await playMassMedia(
+        maEntityId,
+        chunk.length === 1 ? chunk[0] : chunk,
+        "track",
+        "add"
+      );
+      queuedCount += chunk.length;
+    } catch {
+      failedCount += chunk.length;
+    }
+
+    if (!isCancelled()) {
+      onProgress?.({ queuedCount, totalCount: uniqueUris.length });
+    }
+  }
+
+  return {
+    totalCount: uniqueUris.length,
+    queuedCount,
+    failedCount,
+    cancelled: isCancelled(),
+  };
 }
 
 /**

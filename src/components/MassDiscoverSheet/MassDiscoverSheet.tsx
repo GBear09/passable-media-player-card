@@ -1,6 +1,12 @@
 import { css, keyframes } from "@emotion/react";
 import { memo } from "preact/compat";
-import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "preact/hooks";
 import {
   Chip,
   Icon,
@@ -18,6 +24,7 @@ import {
 import { useToast } from "@components/Toast";
 import { theme } from "@constants";
 import {
+  filterOutSeedTrack,
   formatPlaybackTime,
   getCollectionTracks,
   getSimilarArtists,
@@ -27,6 +34,7 @@ import {
   MassSimilarArtist,
   MassTrackItem,
   playMassMedia,
+  playMassTracksProgressive,
   resolveArtistUri,
   resolveCurrentTrackUri,
   startRadioMix,
@@ -321,6 +329,18 @@ const SimilarFrameView = ({ frame }: { frame: SimilarFrame }) => {
   const [resolvedTrackUri, setResolvedTrackUri] = useState<string | null>(
     frame.trackUri ?? null
   );
+  const [bulkAction, setBulkAction] = useState<"play" | "add" | null>(null);
+  const [bulkProgress, setBulkProgress] = useState<{
+    queued: number;
+    total: number;
+  } | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const frameKey = JSON.stringify({
     maEntityId: frame.maEntityId,
@@ -330,6 +350,8 @@ const SimilarFrameView = ({ frame }: { frame: SimilarFrame }) => {
     artist: frame.artist,
     artistNameFallback: frame.artistNameFallback,
   });
+  const activeFrameKeyRef = useRef(frameKey);
+  activeFrameKeyRef.current = frameKey;
 
   useEffect(() => {
     const preferred =
@@ -348,6 +370,8 @@ const SimilarFrameView = ({ frame }: { frame: SimilarFrame }) => {
     setTracksLoadedKey("");
     setArtistsLoadedKey("");
     setResolvedTrackUri(frame.trackUri ?? null);
+    setBulkAction(null);
+    setBulkProgress(null);
   }, [
     frameKey,
     frame.initialTab,
@@ -389,8 +413,14 @@ const SimilarFrameView = ({ frame }: { frame: SimilarFrame }) => {
         }
 
         const result = await getSimilarTracks(frame.maEntityId, trackUri);
+        const filtered = filterOutSeedTrack(result, {
+          trackUri,
+          alternateTrackUri: frame.trackUri,
+          title: frame.title,
+          artist: frame.artist,
+        });
         if (!cancelled) {
-          setTracks(result);
+          setTracks(filtered);
           setTracksLoadedKey(frameKey);
         }
       } catch (err) {
@@ -536,24 +566,84 @@ const SimilarFrameView = ({ frame }: { frame: SimilarFrame }) => {
 
   const handleBulkPlay = useCallback(
     async (mode: "play" | "add") => {
+      if (bulkAction !== null) return;
       const uris = tracks.map(tr => tr.media_content_id).filter(Boolean);
       if (uris.length === 0) return;
+
+      const requestFrameKey = frameKey;
+      const isCurrentFrame = () =>
+        isMountedRef.current && activeFrameKeyRef.current === requestFrameKey;
+
+      const firstTitle = tracks.find(
+        tr => tr.media_content_id === uris[0]
+      )?.media_title;
+
+      setBulkAction(mode);
+      setBulkProgress({ queued: 0, total: uris.length });
+      showToast(
+        mode === "play"
+          ? "Starting playback…"
+          : `Queueing ${uris.length} ${uris.length === 1 ? "track" : "tracks"}…`,
+        "info"
+      );
+
       try {
-        await playMassMedia(frame.maEntityId, uris, "track", mode);
-        showToast(
-          mode === "add"
-            ? `Added ${uris.length} tracks to queue`
-            : `Playing ${uris.length} similar tracks`,
-          "success"
-        );
+        const result = await playMassTracksProgressive({
+          maEntityId: frame.maEntityId,
+          uris,
+          mode,
+          onFirstBatchReady: ({ remainingCount }) => {
+            if (mode === "play" && remainingCount > 0) {
+              showToast(
+                firstTitle
+                  ? `Playing ${firstTitle} — queueing ${remainingCount} more…`
+                  : `Started playback — queueing ${remainingCount} more…`,
+                "success"
+              );
+            }
+          },
+          onProgress: ({ queuedCount, totalCount }) => {
+            if (isCurrentFrame()) {
+              setBulkProgress({ queued: queuedCount, total: totalCount });
+            }
+          },
+        });
+
+        if (!result.cancelled) {
+          if (result.failedCount === 0) {
+            showToast(
+              mode === "add"
+                ? `Added ${result.queuedCount} ${result.queuedCount === 1 ? "track" : "tracks"} to queue`
+                : result.totalCount === 1
+                  ? `Playing ${firstTitle ?? "1 similar track"}`
+                  : `Playing ${result.totalCount} similar tracks`,
+              "success"
+            );
+          } else if (mode === "play" && result.queuedCount === 1) {
+            showToast(
+              `Playing first track, but failed to queue ${result.failedCount} remaining tracks`,
+              "error"
+            );
+          } else {
+            showToast(
+              `Queued ${result.queuedCount} of ${result.totalCount} tracks (${result.failedCount} failed)`,
+              "error"
+            );
+          }
+        }
       } catch (err) {
         showToast(
           err instanceof Error ? err.message : "Failed to queue tracks",
           "error"
         );
+      } finally {
+        if (isCurrentFrame()) {
+          setBulkAction(null);
+          setBulkProgress(null);
+        }
       }
     },
-    [tracks, frame.maEntityId, showToast]
+    [bulkAction, tracks, frame.maEntityId, frameKey, showToast]
   );
 
   const enqueueMenuItems: OverlayMenuItem[] = useMemo(
@@ -663,18 +753,32 @@ const SimilarFrameView = ({ frame }: { frame: SimilarFrame }) => {
             <Chip
               size="small"
               icon="mdi:play"
+              loading={bulkAction === "play"}
+              disabled={bulkAction !== null}
               onClick={() => handleBulkPlay("play")}
             >
-              {t({ id: "Discover.play_all", defaultMessage: "Play All" })}
+              {bulkAction === "play"
+                ? bulkProgress &&
+                  bulkProgress.queued > 0 &&
+                  bulkProgress.total > 1
+                  ? `Queueing ${bulkProgress.queued}/${bulkProgress.total}…`
+                  : "Starting…"
+                : t({ id: "Discover.play_all", defaultMessage: "Play All" })}
             </Chip>
             <Chip
               size="small"
               invertedColors
               border
               icon="mdi:playlist-plus"
+              loading={bulkAction === "add"}
+              disabled={bulkAction !== null}
               onClick={() => handleBulkPlay("add")}
             >
-              {t({ id: "Discover.queue_all", defaultMessage: "Queue All" })}
+              {bulkAction === "add" && bulkProgress
+                ? bulkProgress.queued > 0
+                  ? `Queueing ${bulkProgress.queued}/${bulkProgress.total}…`
+                  : "Queueing…"
+                : t({ id: "Discover.queue_all", defaultMessage: "Queue All" })}
             </Chip>
           </div>
         </div>
@@ -924,12 +1028,25 @@ const CollectionFrameView = ({ frame }: { frame: CollectionFrame }) => {
   const [tracks, setTracks] = useState<MassTrackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<
+    "play" | "next" | "radio" | null
+  >(null);
+  const isMountedRef = useRef(true);
+  const activeCollectionUriRef = useRef(frame.uri);
+  activeCollectionUriRef.current = frame.uri;
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError(null);
     setTracks([]);
+    setActionLoading(null);
 
     getCollectionTracks(frame.maEntityId, frame.mediaType, frame.uri)
       .then(items => {
@@ -982,6 +1099,9 @@ const CollectionFrameView = ({ frame }: { frame: CollectionFrame }) => {
 
   const handleCollectionAction = useCallback(
     async (mode: "play" | "next" | "add") => {
+      if (actionLoading !== null) return;
+      const requestUri = frame.uri;
+      setActionLoading(mode === "next" ? "next" : "play");
       try {
         await playMassMedia(frame.maEntityId, frame.uri, frame.mediaType, mode);
         const verb =
@@ -996,10 +1116,59 @@ const CollectionFrameView = ({ frame }: { frame: CollectionFrame }) => {
           err instanceof Error ? err.message : "Playback failed",
           "error"
         );
+      } finally {
+        if (
+          isMountedRef.current &&
+          activeCollectionUriRef.current === requestUri
+        ) {
+          setActionLoading(null);
+        }
       }
     },
-    [frame.maEntityId, frame.uri, frame.mediaType, frame.title, showToast]
+    [
+      actionLoading,
+      frame.maEntityId,
+      frame.uri,
+      frame.mediaType,
+      frame.title,
+      showToast,
+    ]
   );
+
+  const handleCollectionRadio = useCallback(async () => {
+    if (actionLoading !== null) return;
+    const requestUri = frame.uri;
+    setActionLoading("radio");
+    try {
+      await startRadioMix(
+        frame.targetEntityId,
+        frame.maEntityId,
+        frame.uri,
+        frame.mediaType as "artist" | "album"
+      );
+      showToast(`Started Radio: ${frame.title}`, "success");
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Failed to start Radio Mix",
+        "error"
+      );
+    } finally {
+      if (
+        isMountedRef.current &&
+        activeCollectionUriRef.current === requestUri
+      ) {
+        setActionLoading(null);
+      }
+    }
+  }, [
+    actionLoading,
+    frame.targetEntityId,
+    frame.maEntityId,
+    frame.uri,
+    frame.mediaType,
+    frame.title,
+    showToast,
+  ]);
 
   return (
     <>
@@ -1008,6 +1177,8 @@ const CollectionFrameView = ({ frame }: { frame: CollectionFrame }) => {
           <Chip
             size="small"
             icon="mdi:play"
+            loading={actionLoading === "play"}
+            disabled={actionLoading !== null}
             onClick={() => handleCollectionAction("play")}
           >
             {t({ id: "Discover.play_all", defaultMessage: "Play All" })}
@@ -1017,6 +1188,8 @@ const CollectionFrameView = ({ frame }: { frame: CollectionFrame }) => {
             invertedColors
             border
             icon="mdi:playlist-play"
+            loading={actionLoading === "next"}
+            disabled={actionLoading !== null}
             onClick={() => handleCollectionAction("next")}
           >
             {t({ id: "Search.enqueue_mode.next", defaultMessage: "Add Next" })}
@@ -1027,24 +1200,9 @@ const CollectionFrameView = ({ frame }: { frame: CollectionFrame }) => {
               invertedColors
               border
               icon="mdi:radio-tower"
-              onClick={async () => {
-                try {
-                  await startRadioMix(
-                    frame.targetEntityId,
-                    frame.maEntityId,
-                    frame.uri,
-                    frame.mediaType as "artist" | "album"
-                  );
-                  showToast(`Started Radio: ${frame.title}`, "success");
-                } catch (err) {
-                  showToast(
-                    err instanceof Error
-                      ? err.message
-                      : "Failed to start Radio Mix",
-                    "error"
-                  );
-                }
-              }}
+              loading={actionLoading === "radio"}
+              disabled={actionLoading !== null}
+              onClick={handleCollectionRadio}
             >
               {t({ id: "Discover.radio", defaultMessage: "Radio" })}
             </Chip>

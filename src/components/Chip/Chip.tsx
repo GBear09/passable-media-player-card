@@ -31,6 +31,10 @@ const styles = {
     "&:hover": {
       opacity: 0.8,
     },
+    "&:disabled": {
+      opacity: 0.55,
+      cursor: "not-allowed",
+    },
     opacity: 1,
     "& ha-icon": {
       pointerEvents: "none",
