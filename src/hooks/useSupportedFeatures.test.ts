@@ -386,6 +386,27 @@ describe("getSupportedFeatures", () => {
       ).toBe(true);
     });
 
+    it("should validate seek feature bit (2)", () => {
+      expect(
+        getSupportedFeatures("playing", {
+          ...baseAttributes,
+          supported_features: 2,
+        }).supportsSeek
+      ).toBe(true);
+      expect(
+        getSupportedFeatures("off", {
+          ...baseAttributes,
+          supported_features: 2,
+        }).supportsSeek
+      ).toBe(false);
+      expect(
+        getSupportedFeatures("playing", {
+          ...baseAttributes,
+          supported_features: 0,
+        }).supportsSeek
+      ).toBe(false);
+    });
+
     it("should work with combined feature flags", () => {
       const combinedFeatures = 16 | 32 | 4096 | 16384 | 32768 | 262144; // All features
       const allAttrs = {

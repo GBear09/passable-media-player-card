@@ -7,15 +7,36 @@ type HassCacheEntry<T = unknown> = {
   staleTime: number;
 };
 
+const MAX_CACHE_ENTRIES = 100;
+
 // A plain cache for request/response pairs with staleTime
 let _hassCache: Record<string, HassCacheEntry<unknown>> = {};
+const _inFlight = new Map<string, Promise<unknown>>();
+
+function setCacheEntry(key: string, entry: HassCacheEntry<unknown>) {
+  // Refresh insertion order on update and evict oldest entries past cap
+  if (key in _hassCache) {
+    const { [key]: _, ...rest } = _hassCache;
+    _hassCache = { ...rest, [key]: entry };
+  } else {
+    _hassCache = { ..._hassCache, [key]: entry };
+  }
+
+  const keys = Object.keys(_hassCache);
+  if (keys.length > MAX_CACHE_ENTRIES) {
+    const excess = keys.length - MAX_CACHE_ENTRIES;
+    const trimmed: Record<string, HassCacheEntry<unknown>> = {};
+    for (let i = excess; i < keys.length; i++) {
+      trimmed[keys[i]] = _hassCache[keys[i]];
+    }
+    _hassCache = trimmed;
+  }
+}
 
 /**
- * Generic function to send a message via hass.connection.sendMessagePromise with caching.
- * @param key Unique cache key for the request (stringify your message or use a hash)
+ * Generic function to send a message via hass.connection.sendMessagePromise with caching
+ * and in-flight request deduplication.
  * @param message The message object to send
- * @param options Optional: { forceRefresh: boolean } to bypass cache
-
  * @param options Optional: { forceRefresh: boolean, staleTime: number (ms) }
  * @returns Promise resolving to the response
  */
@@ -34,15 +55,43 @@ export async function getHassMessageWithCache<T = unknown>(
   ) {
     return entry.value;
   }
+
+  if (!options?.forceRefresh) {
+    const pending = _inFlight.get(key);
+    if (pending) {
+      return pending as Promise<T>;
+    }
+  }
+
   const hass = getHass();
-  const response = (await hass.connection.sendMessagePromise({
-    ...message,
-  })) as T;
-  _hassCache = {
-    ..._hassCache,
-    [key]: { value: response, timestamp: now, staleTime },
-  };
-  return response;
+  if (!hass?.connection?.sendMessagePromise) {
+    return Promise.reject(new Error("Home Assistant connection unavailable"));
+  }
+
+  const promise = (
+    hass.connection.sendMessagePromise({
+      ...message,
+    }) as Promise<T>
+  )
+    .then(response => {
+      setCacheEntry(key, {
+        value: response,
+        timestamp: Date.now(),
+        staleTime,
+      });
+      return response;
+    })
+    .finally(() => {
+      if (_inFlight.get(key) === promise) {
+        _inFlight.delete(key);
+      }
+    });
+
+  if (!options?.forceRefresh) {
+    _inFlight.set(key, promise);
+  }
+
+  return promise;
 }
 
 /**
@@ -53,8 +102,10 @@ export function clearHassMessageCache(key?: string) {
   if (key) {
     const { [key]: _, ...rest } = _hassCache;
     _hassCache = rest;
+    _inFlight.delete(key);
   } else {
     _hassCache = {};
+    _inFlight.clear();
   }
 }
 

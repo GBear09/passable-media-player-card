@@ -61,6 +61,7 @@
     "categories": {
       "All": "All",
       "Favorites": "Favorites",
+      "ForYou": "For You",
       "Favorite": "Favorite",
       "Artists": "Artists",
       "Albums": "Albums",
@@ -104,6 +105,45 @@
     "song_radio": "Song Radio",
     "artist_radio": "Artist Radio",
     "album_radio": "Album Radio"
+  },
+  "Queue": {
+    "autoplay": "Autoplay (Don't Stop the Music)",
+    "crossfade": "Crossfade",
+    "clear_queue": "Clear Queue",
+    "clear_upcoming": "Clear Up Next",
+    "clear_all": "Clear Entire Queue",
+    "play_next": "Play Next",
+    "move_up": "Move Up",
+    "move_down": "Move Down",
+    "remove": "Remove from Queue",
+    "refresh": "Refresh",
+    "empty": "No items in queue."
+  },
+  "Discover": {
+    "title": "Discover",
+    "subtitle": "Similar music in Music Assistant",
+    "similar_tracks": "Similar Tracks",
+    "similar_artists": "Similar Artists",
+    "play_all": "Play All",
+    "queue_all": "Queue All",
+    "view_top_tracks": "View Top Tracks",
+    "view_tracks": "View Tracks",
+    "view_episodes": "View Episodes",
+    "start_artist_radio": "Start Artist Radio",
+    "radio": "Radio",
+    "back": "Back",
+    "close": "Close",
+    "no_track_match": "Could not locate this track in Music Assistant.",
+    "no_artist_match": "Could not locate this artist in Music Assistant.",
+    "no_similar_tracks": "No similar tracks found.",
+    "no_similar_artists": "No similar artists found.",
+    "no_collection_items": "No items found."
+  },
+  "Settings": {
+    "ma_queue_section": "Music Assistant Queue",
+    "ma_autoplay": "Autoplay (Don't Stop the Music)",
+    "ma_crossfade": "MA Queue Crossfade",
+    "ma_no_active_queue": "Start playback to configure Music Assistant queue options."
   },
   "LyrionTrackInfo": {
     "empty_state": "No track info available"

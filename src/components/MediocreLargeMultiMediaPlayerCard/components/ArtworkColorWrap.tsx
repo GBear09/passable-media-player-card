@@ -8,7 +8,7 @@ type ArtworkColorWrapProps = {
 export const ArtworkColorWrap = memo<ArtworkColorWrapProps>(
   forwardRef<HTMLDivElement, ArtworkColorWrapProps>(
     ({ style, useArtColors, ...props }: ArtworkColorWrapProps, ref) => {
-      const { artVars, haVars } = useArtworkColors();
+      const { artVars, haVars } = useArtworkColors(Boolean(useArtColors));
 
       return (
         <ha-card
@@ -20,7 +20,7 @@ export const ArtworkColorWrap = memo<ArtworkColorWrapProps>(
             ...(haVars && useArtColors ? haVars : {}),
             ...(typeof style === "object" ? style : {}),
           }}
-          ref={ref as any}
+          ref={ref as never}
         />
       );
     }

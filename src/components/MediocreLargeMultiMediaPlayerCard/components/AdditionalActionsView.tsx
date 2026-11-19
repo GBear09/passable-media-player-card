@@ -3,7 +3,7 @@ import type { MediocreMultiMediaPlayerCardConfig } from "@types";
 import { CardContext, CardContextType } from "@components/CardContext";
 import { InteractionConfig } from "@types";
 import { Chip, Icon, LyrionTrackInfo, useHass, usePlayer } from "@components";
-import { useActionProps } from "@hooks";
+import { useActionProps, useEffectiveMassPlayer } from "@hooks";
 import { css } from "@emotion/react";
 import { ViewHeader } from "./ViewHeader";
 
@@ -19,12 +19,15 @@ import {
   getHass,
   getIsLmsPlayer,
   getSourceIcon,
+  hasMassQueueService,
   transferLmsQueue,
   transferMaQueue,
   startRadioMix,
 } from "@utils";
 import { useSelectedPlayer } from "@components/SelectedPlayerContext";
 import { LyrionRelatedAlbums } from "@components/LyrionRelatedAlbums";
+import { useMassDiscover } from "@components/MassDiscoverSheet";
+import { useToast } from "@components/Toast";
 
 const styles = {
   root: css({
@@ -47,6 +50,9 @@ const styles = {
 
 export const AdditionalActionsView = memo(() => {
   const { selectedPlayer, setSelectedPlayer } = useSelectedPlayer();
+  const { maState, isMaTrackSynced } = useEffectiveMassPlayer();
+  const { openSimilar, isSupported: isDiscoverSupported } = useMassDiscover();
+  const { showToast } = useToast();
 
   const {
     custom_buttons,
@@ -78,11 +84,19 @@ export const AdditionalActionsView = memo(() => {
   );
 
   const transferQueue = useCallback(
-    (targetEntity: string) => {
+    async (targetEntity: string, targetName: string) => {
       if (!ma_entity_id) return;
-      transferMaQueue(ma_entity_id, targetEntity);
+      try {
+        await transferMaQueue(ma_entity_id, targetEntity);
+        showToast(`Transferred queue to ${targetName}`, "success");
+      } catch (err) {
+        showToast(
+          err instanceof Error ? err.message : "Failed to transfer queue",
+          "error"
+        );
+      }
     },
-    [ma_entity_id]
+    [ma_entity_id, showToast]
   );
 
   const maTransferMenuItems: OverlayMenuItem[] = useMemo(() => {
@@ -92,11 +106,12 @@ export const AdditionalActionsView = memo(() => {
       const state = hass.states[mp.entity_id];
       if (!state || state.state === "unavailable" || mp.entity_id === entity_id)
         return null;
+      const label = mp.name || state.attributes.friendly_name || mp.entity_id;
       return {
-        label: state.attributes.friendly_name || mp.entity_id,
+        label,
         onClick: () => {
           if (!mp.ma_entity_id) return;
-          transferQueue(mp.ma_entity_id);
+          transferQueue(mp.ma_entity_id, label);
           setSelectedPlayer(mp);
         },
       };
@@ -145,7 +160,8 @@ export const AdditionalActionsView = memo(() => {
     getHass().callService("button", "press", {
       entity_id: ma_favorite_button_entity_id,
     });
-  }, [ma_favorite_button_entity_id]);
+    showToast("Added to favorites", "success");
+  }, [ma_favorite_button_entity_id, showToast]);
 
   const sourceSelectMenuItems: OverlayMenuItem[] = useMemo(() => {
     return (player.attributes.source_list ?? []).map(source => ({
@@ -159,59 +175,97 @@ export const AdditionalActionsView = memo(() => {
     }));
   }, [player.attributes.source_list, player.entity_id]);
 
+  const mediaTitle = player.attributes.media_title;
+  const mediaArtist = player.attributes.media_artist;
+  const mediaAlbum = player.attributes.media_album_name;
+  const maMediaContentId = maState?.attributes?.media_content_id;
+
   const radioMixMenuItems: OverlayMenuItem[] = useMemo(() => {
     const items: OverlayMenuItem[] = [];
-    const mediaTitle = player.attributes.media_title;
-    const mediaArtist = player.attributes.media_artist;
-    const mediaAlbum = player.attributes.media_album_name;
 
     if (mediaTitle) {
+      const songSeed =
+        isMaTrackSynced && maMediaContentId ? maMediaContentId : mediaTitle;
       items.push({
         label: `Song Radio (${mediaTitle})`,
         icon: "mdi:music-note",
-        onClick: () =>
-          startRadioMix(
-            entity_id,
-            ma_entity_id ?? undefined,
-            mediaTitle,
-            "track"
-          ),
+        onClick: async () => {
+          try {
+            await startRadioMix(
+              entity_id,
+              ma_entity_id ?? undefined,
+              songSeed,
+              "track"
+            );
+            showToast(`Started Song Radio: ${mediaTitle}`, "success");
+          } catch (err) {
+            showToast(
+              err instanceof Error ? err.message : "Failed to start Song Radio",
+              "error"
+            );
+          }
+        },
       });
     }
     if (mediaArtist) {
       items.push({
         label: `Artist Radio (${mediaArtist})`,
         icon: "mdi:account-music",
-        onClick: () =>
-          startRadioMix(
-            entity_id,
-            ma_entity_id ?? undefined,
-            mediaArtist,
-            "artist"
-          ),
+        onClick: async () => {
+          try {
+            await startRadioMix(
+              entity_id,
+              ma_entity_id ?? undefined,
+              mediaArtist,
+              "artist"
+            );
+            showToast(`Started Artist Radio: ${mediaArtist}`, "success");
+          } catch (err) {
+            showToast(
+              err instanceof Error
+                ? err.message
+                : "Failed to start Artist Radio",
+              "error"
+            );
+          }
+        },
       });
     }
     if (mediaAlbum) {
       items.push({
         label: `Album Radio (${mediaAlbum})`,
         icon: "mdi:album",
-        onClick: () =>
-          startRadioMix(
-            entity_id,
-            ma_entity_id ?? undefined,
-            mediaAlbum,
-            "album"
-          ),
+        onClick: async () => {
+          try {
+            await startRadioMix(
+              entity_id,
+              ma_entity_id ?? undefined,
+              mediaAlbum,
+              "album"
+            );
+            showToast(`Started Album Radio: ${mediaAlbum}`, "success");
+          } catch (err) {
+            showToast(
+              err instanceof Error
+                ? err.message
+                : "Failed to start Album Radio",
+              "error"
+            );
+          }
+        },
       });
     }
 
     return items;
   }, [
-    player.attributes.media_title,
-    player.attributes.media_artist,
-    player.attributes.media_album_name,
+    mediaTitle,
+    mediaArtist,
+    mediaAlbum,
+    isMaTrackSynced,
+    maMediaContentId,
     entity_id,
     ma_entity_id,
+    showToast,
   ]);
 
   const moreInfoButtonProps = useActionProps({
@@ -223,6 +277,21 @@ export const AdditionalActionsView = memo(() => {
   });
 
   const { t } = useIntl();
+
+  const canSimilarTracks = Boolean(
+    isDiscoverSupported &&
+    ma_entity_id &&
+    isMainEntityMassPlayer &&
+    hasMassQueueService("get_similar_tracks") &&
+    mediaTitle
+  );
+  const canSimilarArtists = Boolean(
+    isDiscoverSupported &&
+    ma_entity_id &&
+    isMainEntityMassPlayer &&
+    hasMassQueueService("get_similar_artists") &&
+    mediaArtist
+  );
 
   return (
     <div css={styles.root}>
@@ -259,11 +328,54 @@ export const AdditionalActionsView = memo(() => {
               side="bottom"
               renderTrigger={triggerProps => (
                 <Chip icon="mdi:radio-tower" {...triggerProps}>
-                  Start Radio Mix
+                  {t({
+                    id: "AdditionalActionsMenu.start_radio_mix",
+                    defaultMessage: "Start Radio Mix",
+                  })}
                   <Icon size="x-small" icon="mdi:chevron-down" />
                 </Chip>
               )}
             />
+          )}
+          {canSimilarTracks && ma_entity_id && (
+            <Chip
+              icon="mdi:playlist-music-outline"
+              onClick={() =>
+                openSimilar({
+                  initialTab: "tracks",
+                  maEntityId: ma_entity_id,
+                  targetEntityId: entity_id,
+                  trackUri: isMaTrackSynced ? maMediaContentId : undefined,
+                  title: mediaTitle,
+                  artist: mediaArtist,
+                })
+              }
+            >
+              {t({
+                id: "Discover.similar_tracks",
+                defaultMessage: "Similar Tracks",
+              })}
+            </Chip>
+          )}
+          {canSimilarArtists && ma_entity_id && (
+            <Chip
+              icon="mdi:account-group-outline"
+              onClick={() =>
+                openSimilar({
+                  initialTab: "artists",
+                  maEntityId: ma_entity_id,
+                  targetEntityId: entity_id,
+                  trackUri: isMaTrackSynced ? maMediaContentId : undefined,
+                  title: mediaTitle,
+                  artist: mediaArtist,
+                })
+              }
+            >
+              {t({
+                id: "Discover.similar_artists",
+                defaultMessage: "Similar Artists",
+              })}
+            </Chip>
           )}
           {!!ma_entity_id && isMainEntityMassPlayer && (
             <Fragment>

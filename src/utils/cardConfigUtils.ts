@@ -43,6 +43,15 @@ export const getDefaultValuesFromConfig = (
       config?.options?.use_volume_up_down_for_step_buttons ?? false,
     use_experimental_lms_media_browser:
       config?.options?.use_experimental_lms_media_browser ?? false,
+    ...(config?.options?.skip_controls
+      ? { skip_controls: config.options.skip_controls }
+      : {}),
+    ...(config?.options?.skip_backward_seconds !== undefined
+      ? { skip_backward_seconds: config.options.skip_backward_seconds }
+      : {}),
+    ...(config?.options?.skip_forward_seconds !== undefined
+      ? { skip_forward_seconds: config.options.skip_forward_seconds }
+      : {}),
   },
   grid_options: config?.grid_options,
   visibility: config?.visibility,
@@ -82,6 +91,15 @@ export const getDefaultValuesFromMassiveConfig = (
       config?.options?.use_volume_up_down_for_step_buttons ?? false,
     use_experimental_lms_media_browser:
       config?.options?.use_experimental_lms_media_browser ?? false,
+    ...(config?.options?.skip_controls
+      ? { skip_controls: config.options.skip_controls }
+      : {}),
+    ...(config?.options?.skip_backward_seconds !== undefined
+      ? { skip_backward_seconds: config.options.skip_backward_seconds }
+      : {}),
+    ...(config?.options?.skip_forward_seconds !== undefined
+      ? { skip_forward_seconds: config.options.skip_forward_seconds }
+      : {}),
   },
   grid_options: config?.grid_options,
   visibility: config?.visibility,
@@ -148,6 +166,9 @@ export const getSimpleConfigFromFormValues = (
   if (config.options?.use_experimental_lms_media_browser === false) {
     delete config.options.use_experimental_lms_media_browser;
   }
+  if (config.options?.skip_controls === "auto") {
+    delete config.options.skip_controls;
+  }
 
   if (Object.keys(config.options ?? {}).length === 0) {
     delete config.options;
@@ -213,6 +234,9 @@ export const getSimpleConfigFromMassiveFormValues = (
   }
   if (config.options?.use_experimental_lms_media_browser === false) {
     delete config.options.use_experimental_lms_media_browser;
+  }
+  if (config.options?.skip_controls === "auto") {
+    delete config.options.skip_controls;
   }
 
   if (Object.keys(config.options ?? {}).length === 0) {

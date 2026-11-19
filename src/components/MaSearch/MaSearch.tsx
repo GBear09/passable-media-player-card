@@ -1,10 +1,11 @@
 import { Chip, IconButton, Input } from "@components";
-import { useState } from "preact/hooks";
+import { useCallback, useState } from "preact/hooks";
 import { useDebounce } from "@uidotdev/usehooks";
 import { searchStyles } from "@components/MediaSearch";
-import { MaFilterType, MaEnqueueMode } from "./types";
+import { MaFilterType, MaEnqueueMode, MaMediaItem } from "./types";
 import { useSearchQuery } from "./useSearchQuery";
 import { useFavorites } from "./useFavorites";
+import { useRecommendations } from "./useRecommendations";
 import { filters } from "./constants";
 import { MaMediaItemsList } from "./MaMediaItemsList";
 import { JSX } from "preact/jsx-runtime";
@@ -13,6 +14,8 @@ import {
   OverlayMenu,
   OverlayMenuItem,
 } from "@components/OverlayMenu/OverlayMenu";
+import { useToast } from "@components/Toast";
+import { hasMassQueueService } from "@utils";
 
 export type MaSearchProps = {
   maEntityId: string;
@@ -32,17 +35,125 @@ export const MaSearch = ({
   renderHeader,
 }: MaSearchProps) => {
   const { t } = useIntl();
+  const { showToast } = useToast();
   const [query, setQuery] = useState("");
   const [enqueueMode, setEnqueueMode] = useState<MaEnqueueMode>("play");
   const debouncedQuery = useDebounce(query, 600);
   const [activeFilter, setActiveFilter] = useState<MaFilterType>("all");
-
-  const { results, loading, playItem } = useSearchQuery(
-    debouncedQuery,
-    activeFilter
+  const [browseSource, setBrowseSource] = useState<"favorites" | "for-you">(
+    "favorites"
   );
 
-  const { favorites } = useFavorites(activeFilter, query === "");
+  const canShowRecommendations = hasMassQueueService("get_recommendations");
+
+  const {
+    results,
+    loading: searchLoading,
+    playItem,
+  } = useSearchQuery(debouncedQuery, activeFilter, maEntityId);
+
+  const { favorites, loading: favoritesLoading } = useFavorites(
+    activeFilter,
+    query === "" && browseSource === "favorites",
+    maEntityId
+  );
+
+  const {
+    folders: recommendationFolders,
+    loading: recommendationsLoading,
+    error: recommendationsError,
+  } = useRecommendations(
+    maEntityId,
+    query === "" && browseSource === "for-you"
+  );
+
+  const handlePlayWithMode = useCallback(
+    async (item: MaMediaItem, mode: MaEnqueueMode) => {
+      try {
+        await playItem(item, maEntityId, mode);
+        const verb =
+          mode === "next"
+            ? "Playing next"
+            : mode === "add"
+              ? "Added to queue"
+              : mode === "replace"
+                ? "Replaced queue with"
+                : mode === "replace_next"
+                  ? "Queued next"
+                  : "Playing";
+        showToast(`${verb}: ${item.name}`, "success");
+      } catch (err) {
+        showToast(
+          err instanceof Error ? err.message : "Playback failed",
+          "error"
+        );
+      }
+    },
+    [playItem, maEntityId, showToast]
+  );
+
+  const renderFilterChips = () => {
+    const showCategoryFilters = query !== "" || browseSource === "favorites";
+    return (
+      <>
+        {query === "" && canShowRecommendations && (
+          <>
+            <Chip
+              css={searchStyles.chip}
+              style={{
+                "--mmpc-chip-horizontal-margin": `${horizontalPadding}px`,
+                opacity: browseSource === "favorites" ? 1 : 0.65,
+                fontWeight: browseSource === "favorites" ? "bold" : "normal",
+              }}
+              onClick={() => setBrowseSource("favorites")}
+              icon="mdi:heart"
+            >
+              {t({
+                id: "Search.categories.Favorites",
+                defaultMessage: "Favorites",
+              })}
+            </Chip>
+            <Chip
+              css={searchStyles.chip}
+              style={{
+                opacity: browseSource === "for-you" ? 1 : 0.65,
+                fontWeight: browseSource === "for-you" ? "bold" : "normal",
+              }}
+              onClick={() => setBrowseSource("for-you")}
+              icon="mdi:auto-fix"
+            >
+              {t({
+                id: "Search.categories.ForYou",
+                defaultMessage: "For You",
+              })}
+            </Chip>
+            {showCategoryFilters && (
+              <div css={searchStyles.verticalChipSeperator} />
+            )}
+          </>
+        )}
+        {showCategoryFilters &&
+          filters.map(filter => (
+            <Chip
+              css={searchStyles.chip}
+              style={{
+                "--mmpc-chip-horizontal-margin": `${horizontalPadding}px`,
+                opacity: activeFilter === filter.type ? 1 : 0.6,
+                fontWeight: activeFilter === filter.type ? "bold" : "normal",
+              }}
+              key={filter.type}
+              onClick={() => setActiveFilter(filter.type)}
+              icon={filter.icon}
+            >
+              {t({
+                id: `Search.categories.${filter.label}`,
+                defaultMessage: filter.label,
+              })}
+            </Chip>
+          ))}
+      </>
+    );
+  };
 
   const renderSearchBar = () => {
     return (
@@ -53,7 +164,7 @@ export const MaSearch = ({
             placeholder={t({ id: "Search.input_placeholder" })}
             onChange={setQuery}
             value={query}
-            loading={loading}
+            loading={searchLoading}
             css={searchStyles.input}
           />
           <OverlayMenu
@@ -132,26 +243,14 @@ export const MaSearch = ({
     );
   };
 
-  const renderFilterChips = () => {
-    return filters.map(filter => (
-      <Chip
-        css={searchStyles.chip}
-        style={{
-          "--mmpc-chip-horizontal-margin": `${horizontalPadding}px`,
-          opacity: activeFilter === filter.type ? 1 : 0.6,
-          fontWeight: activeFilter === filter.type ? "bold" : "normal",
-        }}
-        key={filter.type}
-        onClick={() => setActiveFilter(filter.type)}
-        icon={filter.icon}
-      >
-        {t({
-          id: `Search.categories.${filter.label}`,
-          defaultMessage: filter.label,
-        })}
-      </Chip>
-    ));
-  };
+  const isForYouMode =
+    query === "" && browseSource === "for-you" && canShowRecommendations;
+  const listLoading =
+    query !== ""
+      ? searchLoading
+      : isForYouMode
+        ? recommendationsLoading
+        : favoritesLoading;
 
   return (
     <div
@@ -162,10 +261,21 @@ export const MaSearch = ({
     >
       <MaMediaItemsList
         renderHeader={searchBarPosition === "top" ? renderSearchBar : undefined}
+        maEntityId={maEntityId}
+        loading={listLoading}
+        error={isForYouMode ? recommendationsError : null}
+        recommendationFolders={isForYouMode ? recommendationFolders : undefined}
         results={
-          query !== "" && results ? results : favorites ? favorites : undefined
+          isForYouMode
+            ? undefined
+            : query !== "" && results
+              ? results
+              : favorites
+                ? favorites
+                : undefined
         }
-        onItemClick={item => playItem(item, maEntityId, enqueueMode)}
+        onItemClick={item => handlePlayWithMode(item, enqueueMode)}
+        onPlayWithMode={handlePlayWithMode}
         style={{
           "--mmpc-search-padding": `${horizontalPadding}px`,
         }}

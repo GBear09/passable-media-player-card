@@ -74,4 +74,24 @@ describe("getHassMessageWithCache", () => {
     clearHassMessageCache();
     expect(Object.keys(getHassMessageCache())).toHaveLength(0);
   });
+
+  it("deduplicates concurrent in-flight calls for the same message", async () => {
+    const msg = { type: "inflight", id: 1 };
+    const [r1, r2] = await Promise.all([
+      getHassMessageWithCache(msg),
+      getHassMessageWithCache(msg),
+    ]);
+    expect(r1).toEqual(r2);
+    expect(callCounter).toBe(1);
+  });
+
+  it("evicts oldest entries when cache exceeds maximum size", async () => {
+    for (let i = 0; i < 105; i++) {
+      await getHassMessageWithCache({ type: "evict", index: i });
+    }
+    const keys = Object.keys(getHassMessageCache());
+    expect(keys).toHaveLength(100);
+    expect(keys).not.toContain(JSON.stringify({ type: "evict", index: 0 }));
+    expect(keys).toContain(JSON.stringify({ type: "evict", index: 104 }));
+  });
 });

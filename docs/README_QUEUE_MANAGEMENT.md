@@ -40,8 +40,10 @@ Make sure you are have the [lyrion_cli integration](https://github.com/peteS-UK/
 
 - View the current playback queue
 - Skip to any item in the queue
-- Reorder items (move up/down)
-- Remove items from the queue
+- Reorder items (move up/down, or one-tap **Play Next** via `mass_queue.move_queue_item_next`)
+- Remove items from the queue, **Clear Up Next** (`mass_queue.clear_queue_from_here`) without interrupting playback, or clear the entire queue
+- Toggle Music Assistant **Autoplay** (`mass_queue.set_autoplay`) and **Crossfade** (`mass_queue.set_crossfade`) synced via `mass_queue/get_queue_info`
+- Jump directly to **Similar Tracks**, **Similar Artists**, or **Song Radio** from any queued track
 
 ## Notes
 

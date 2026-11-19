@@ -1,10 +1,8 @@
-import { IconButton, useHass, usePlayer } from "@components";
+import { IconButton, usePlayer } from "@components";
 import { useSupportedFeatures } from "@hooks";
 import { css } from "@emotion/react";
 import { usePlayerActions } from "@hooks/usePlayerActions";
-import { useSelectedPlayer } from "@components/SelectedPlayerContext";
-import { getHasMassFeatures } from "@utils";
-import { MediaPlayerEntity } from "@types";
+import { useEffectiveMassPlayer } from "@hooks/useEffectiveMassPlayer";
 
 const styles = {
   root: css({
@@ -32,29 +30,8 @@ const styles = {
 };
 
 export const PlaybackControls = () => {
-  const { selectedPlayer } = useSelectedPlayer();
-  const player = usePlayer();
-  const {
-    attributes: { shuffle, repeat },
-    state,
-    entity_id: entityId,
-  } = player;
-
-  const maEntityId = selectedPlayer?.ma_entity_id;
-  const isMass = maEntityId ? getHasMassFeatures(entityId, maEntityId) : false;
-  const hass = useHass();
-  const maState = maEntityId
-    ? (hass?.states?.[maEntityId] as MediaPlayerEntity | undefined)
-    : undefined;
-
-  const effectiveShuffle =
-    isMass && maState?.attributes?.shuffle !== undefined
-      ? maState.attributes.shuffle
-      : shuffle;
-  const effectiveRepeat =
-    isMass && maState?.attributes?.repeat !== undefined
-      ? maState.attributes.repeat
-      : repeat;
+  const { state } = usePlayer();
+  const { effectiveShuffle, effectiveRepeat } = useEffectiveMassPlayer();
 
   const playing = state === "playing";
 

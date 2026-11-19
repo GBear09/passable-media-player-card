@@ -4,13 +4,17 @@ export type QueueItem = {
   artist?: string;
   album?: string;
   artworkUrl?: string;
+  uri?: string;
+  favorite?: boolean;
   playlistIndex: number;
   isPlaying: boolean;
   isFirst: boolean;
   isLast: boolean;
+  canMoveUp?: boolean;
   moveItem?: (toIndex: number) => Promise<void>;
   moveItemUp?: () => Promise<void>;
   moveItemDown?: () => Promise<void>;
+  moveItemNext?: () => Promise<void>;
   skipToItem: () => Promise<void>;
   deleteItem: () => Promise<void>;
 };

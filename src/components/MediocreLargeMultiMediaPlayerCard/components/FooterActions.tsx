@@ -6,7 +6,7 @@ import { InteractionConfig, MediocreMultiMediaPlayerCardConfig } from "@types";
 import { NavigationRoute } from "@components/MediocreLargeMultiMediaPlayerCard";
 import { useActionProps, useCanDisplayQueue } from "@hooks";
 import { memo } from "preact/compat";
-import { getHasMediaBrowser, getHasSearch } from "@utils";
+import { getHasMediaBrowser, getHasSearch, hasMassQueueService } from "@utils";
 import { useSelectedPlayer } from "@components/SelectedPlayerContext";
 
 const styles = {
@@ -81,7 +81,14 @@ export const FooterActions = memo<FooterActionsProps>(
       );
     }, [custom_buttons]);
 
-    const showSettingsButton = !!settingsCustomButton || hasNativeSettings;
+    const hasMaQueueSettings = Boolean(
+      ma_entity_id &&
+      (hasMassQueueService("set_autoplay") ||
+        hasMassQueueService("set_crossfade"))
+    );
+
+    const showSettingsButton =
+      !!settingsCustomButton || hasNativeSettings || hasMaQueueSettings;
 
     const hideActionsTab =
       config.options?.hide_actions_tab ??
@@ -98,6 +105,8 @@ export const FooterActions = memo<FooterActionsProps>(
           <IconButton
             size="small"
             icon={"mdi:home"}
+            title="Home"
+            aria-label="Home"
             onClick={() => setNavigationRoute("massive")}
             selected={navigationRoute === "massive"}
           />
@@ -106,6 +115,8 @@ export const FooterActions = memo<FooterActionsProps>(
           <IconButton
             size="small"
             icon={"mdi:magnify"}
+            title="Search"
+            aria-label="Search"
             onClick={() => setNavigationRoute("search")}
             selected={navigationRoute === "search"}
           />
@@ -114,6 +125,8 @@ export const FooterActions = memo<FooterActionsProps>(
           <IconButton
             size="small"
             icon={"mdi:folder-music"}
+            title="Browse Media"
+            aria-label="Browse Media"
             onClick={() => setNavigationRoute("media-browser")}
             selected={navigationRoute === "media-browser"}
           />
@@ -122,12 +135,20 @@ export const FooterActions = memo<FooterActionsProps>(
           <IconButton
             size="small"
             icon={"mdi:playlist-music"}
+            title="Queue"
+            aria-label="Queue"
             onClick={() => setNavigationRoute("queue")}
             selected={navigationRoute === "queue"}
           />
         )}
         {showSettingsButton && (
-          <IconButton size="small" icon={"mdi:tune"} onClick={onOpenSettings} />
+          <IconButton
+            size="small"
+            icon={"mdi:tune"}
+            title="Speaker Settings"
+            aria-label="Speaker Settings"
+            onClick={onOpenSettings}
+          />
         )}
         {nonSettingsCustomButtons.length === 1 ? (
           <CustomButton
@@ -140,6 +161,8 @@ export const FooterActions = memo<FooterActionsProps>(
           <IconButton
             size="small"
             icon={"mdi:dots-horizontal"}
+            title="More Actions"
+            aria-label="More Actions"
             onClick={() => setNavigationRoute("custom-buttons")}
             selected={navigationRoute === "custom-buttons"}
           />
@@ -147,6 +170,8 @@ export const FooterActions = memo<FooterActionsProps>(
         <IconButton
           size="small"
           icon={"mdi:speaker-multiple"}
+          title="Speakers"
+          aria-label="Speakers"
           onClick={() => setNavigationRoute("speaker-grouping")}
           selected={navigationRoute === "speaker-grouping"}
         />

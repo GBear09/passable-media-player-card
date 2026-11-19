@@ -30,3 +30,5 @@ export * from "./supportedFeaturesUtils";
 export * from "./transferLmsQueue";
 export * from "./transferMaQueue";
 export * from "./startRadioMix";
+export * from "./massQueueClient";
+export * from "./playbackTimeUtils";

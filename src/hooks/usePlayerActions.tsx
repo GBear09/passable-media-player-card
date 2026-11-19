@@ -1,37 +1,14 @@
-import { useHass, usePlayer } from "@components";
-import { getHass, getHasMassFeatures } from "@utils";
+import { usePlayer } from "@components";
+import { getHass } from "@utils";
 import { useSupportedFeatures } from "@hooks/useSupportedFeatures";
-import { useCallback, useContext, useMemo } from "preact/hooks";
-import { SelectedPlayerContext } from "@components/SelectedPlayerContext";
-import { MediaPlayerEntity } from "@types";
+import { useCallback, useMemo } from "preact/hooks";
+import { useEffectiveMassPlayer } from "./useEffectiveMassPlayer";
 
 export const usePlayerActions = () => {
   const player = usePlayer();
-  const {
-    entity_id,
-    state,
-    attributes: { shuffle, repeat },
-  } = player;
-
-  const selectedPlayerContext = useContext(SelectedPlayerContext);
-  const selectedPlayer = selectedPlayerContext?.selectedPlayer;
-  const maEntityId = selectedPlayer?.ma_entity_id;
-
-  const hass = useHass();
-  const isMass = maEntityId ? getHasMassFeatures(entity_id, maEntityId) : false;
-  const maState = maEntityId
-    ? (hass?.states?.[maEntityId] as MediaPlayerEntity | undefined)
-    : undefined;
-
-  const queueEntityId = isMass && maEntityId ? maEntityId : entity_id;
-  const effectiveShuffle =
-    isMass && maState?.attributes?.shuffle !== undefined
-      ? maState.attributes.shuffle
-      : shuffle;
-  const effectiveRepeat =
-    isMass && maState?.attributes?.repeat !== undefined
-      ? maState.attributes.repeat
-      : repeat;
+  const { entity_id, state } = player;
+  const { queueEntityId, effectiveShuffle, effectiveRepeat } =
+    useEffectiveMassPlayer();
 
   const { supportsPause, supportsStop } = useSupportedFeatures();
 

@@ -16,17 +16,19 @@ ma_entity_id: media_player.living_room_ma
 
 ## Features
 
-### 1. Queue Management (Requires mass_queue)
+### 1. Queue Management & Discovery (Requires `mass_queue`)
 
-- If the [mass_queue integration](https://github.com/music-assistant/ma-queue) is installed, you can:
-  - View the current queue
-  - Reorder tracks (move up/down)
-  - Remove items from the queue
-  - Skip to any item in the queue
+- If the [mass_queue integration](https://github.com/droans/mass_queue) (v0.11.0+ recommended) is installed, you can:
+  - View the current queue, reorder tracks (move up/down, or move straight to **Play Next**), remove items, **Clear Up Next**, or skip to any item
+  - Toggle **Autoplay** (_Don't Stop the Music_) and **Crossfade** directly from the queue header or Speaker Settings bottom sheet (with live status via `mass_queue/get_queue_info`)
+  - Explore **Similar Tracks** and **Similar Artists** from Now Playing, Queue items, or Search results, plus drill down into artist top tracks, album tracks, playlist tracks, and podcast episodes
+  - Browse **For You** recommendations alongside Favorites in Music Assistant Search
+  - Use `-15s` / `+30s` skip controls (`mass_queue.skip`) on podcasts, audiobooks, and long tracks (configurable via `options.skip_controls`: `auto` | `always` | `never`, with optional `skip_backward_seconds` and `skip_forward_seconds`)
+  - Toggle favorites on and off (`mass_queue.unfavorite_current_item`)
 
-### 2. Search
+### 2. Search & Recommendations
 
-- By simply configuring `ma_entity_id` search will work. No further configuration is needed.
+- By simply configuring `ma_entity_id`, Music Assistant search, favorites, and recommendations work without needing admin permissions (`mass_queue/get_info` resolves config entries cleanly).
 
 ### 3. Search and Media Browser
 

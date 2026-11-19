@@ -1,11 +1,13 @@
 import { css, keyframes } from "@emotion/react";
 import { memo } from "preact/compat";
-import { useCallback, useMemo } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { Icon, IconButton, Select, Slider, useHass } from "@components";
 import { theme } from "@constants";
 import { useSelectedPlayer } from "@components/SelectedPlayerContext";
 import { getHass } from "@utils";
 import { HassEntity } from "home-assistant-js-websocket";
+import { useMassQueueInfo } from "@hooks";
+import { useIntl } from "@components/i18n";
 
 const slideUp = keyframes`
   from {
@@ -208,6 +210,20 @@ const styles = {
     color: theme.colors.onCardMuted,
     fontSize: "14px",
   }),
+  badgeRow: css({
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px",
+    marginTop: "2px",
+  }),
+  statusBadge: css({
+    fontSize: "11px",
+    fontWeight: 500,
+    padding: "3px 8px",
+    borderRadius: "10px",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    color: theme.colors.onCardMuted,
+  }),
 };
 
 function getNumberIcon(entityId: string): string {
@@ -245,20 +261,53 @@ export type SpeakerSettingsBottomSheetProps = {
 
 export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
   ({ isOpen, onClose }) => {
+    const { t } = useIntl();
     const hass = useHass();
     const { selectedPlayer } = useSelectedPlayer();
+    const [refreshTick, setRefreshTick] = useState(0);
+    const [optimisticStates, setOptimisticStates] = useState<
+      Record<string, string>
+    >({});
+
+    useEffect(() => {
+      if (!isOpen) {
+        setOptimisticStates({});
+        return;
+      }
+      const interval = window.setInterval(() => {
+        setRefreshTick(prev => prev + 1);
+      }, 1500);
+      return () => window.clearInterval(interval);
+    }, [isOpen]);
 
     const speakerName = selectedPlayer?.name || "Speaker";
     const entityId = selectedPlayer?.entity_id || "";
+    const maEntityId = selectedPlayer?.ma_entity_id;
     const baseName = entityId.replace("media_player.", "").replace(/_ma$/, "");
+
+    const {
+      queueInfo,
+      updating: queueInfoUpdating,
+      canSetAutoplay,
+      canSetCrossfade,
+      toggleAutoplay,
+      toggleCrossfade,
+    } = useMassQueueInfo(maEntityId, isOpen && Boolean(maEntityId));
+
+    // Read fresh states from live hass when open so switch/number/select changes reflect immediately
+    const liveStates = useMemo(() => {
+      const currentHass = getHass();
+      return currentHass?.states ?? hass?.states;
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshTick polls live entity state changes while open
+    }, [hass?.states, refreshTick]);
 
     // Discover settings entities matching speaker
     const { numbers, switches, selects } = useMemo(() => {
-      if (!hass?.states || !baseName) {
+      if (!liveStates || !baseName) {
         return { numbers: [], switches: [], selects: [] };
       }
 
-      const allStates = Object.values(hass.states) as HassEntity[];
+      const allStates = Object.values(liveStates) as HassEntity[];
       const speakerPattern = new RegExp(
         `^(number|switch|select)\\.${baseName}_`,
         "i"
@@ -300,10 +349,14 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
         switches: foundSwitches,
         selects: foundSelects,
       };
-    }, [hass?.states, baseName]);
+    }, [liveStates, baseName]);
 
     const handleNumberChange = useCallback(
       (numberEntityId: string, value: number) => {
+        setOptimisticStates(prev => ({
+          ...prev,
+          [numberEntityId]: String(value),
+        }));
         getHass().callService("number", "set_value", {
           entity_id: numberEntityId,
           value,
@@ -312,14 +365,25 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
       []
     );
 
-    const handleSwitchToggle = useCallback((switchEntityId: string) => {
-      getHass().callService("switch", "toggle", {
-        entity_id: switchEntityId,
-      });
-    }, []);
+    const handleSwitchToggle = useCallback(
+      (switchEntityId: string, currentlyOn: boolean) => {
+        setOptimisticStates(prev => ({
+          ...prev,
+          [switchEntityId]: currentlyOn ? "off" : "on",
+        }));
+        getHass().callService("switch", "toggle", {
+          entity_id: switchEntityId,
+        });
+      },
+      []
+    );
 
     const handleSelectChange = useCallback(
       (selectEntityId: string, option: string) => {
+        setOptimisticStates(prev => ({
+          ...prev,
+          [selectEntityId]: option,
+        }));
         getHass().callService("select", "select_option", {
           entity_id: selectEntityId,
           option,
@@ -328,10 +392,32 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
       []
     );
 
+    // Clear optimistic overrides once live state catches up
+    useEffect(() => {
+      if (!liveStates || Object.keys(optimisticStates).length === 0) return;
+      setOptimisticStates(prev => {
+        let changed = false;
+        const next = { ...prev };
+        for (const [id, val] of Object.entries(prev)) {
+          if (liveStates[id]?.state === val) {
+            delete next[id];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, [liveStates, optimisticStates]);
+
     if (!isOpen) return null;
 
+    const showMaSection = Boolean(
+      maEntityId && (canSetAutoplay || canSetCrossfade || queueInfo)
+    );
     const hasAnyControls =
-      numbers.length > 0 || switches.length > 0 || selects.length > 0;
+      showMaSection ||
+      numbers.length > 0 ||
+      switches.length > 0 ||
+      selects.length > 0;
 
     return (
       <div css={styles.overlay}>
@@ -353,11 +439,121 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
               </div>
             ) : null}
 
+            {showMaSection && (
+              <div css={styles.section}>
+                <h4 css={styles.sectionTitle}>
+                  {t({
+                    id: "Settings.ma_queue_section",
+                    defaultMessage: "Music Assistant Queue",
+                  })}
+                </h4>
+                {queueInfo ? (
+                  <div css={styles.switchGrid}>
+                    {canSetAutoplay && (
+                      <div
+                        css={styles.switchRow}
+                        onClick={() => {
+                          if (!queueInfoUpdating) toggleAutoplay();
+                        }}
+                      >
+                        <span css={styles.switchLeft}>
+                          <Icon size="x-small" icon="mdi:infinity" />
+                          {t({
+                            id: "Settings.ma_autoplay",
+                            defaultMessage: "Autoplay (Don't Stop the Music)",
+                          })}
+                        </span>
+                        <div
+                          css={[
+                            styles.togglePill,
+                            queueInfo.autoplay_enabled &&
+                              styles.togglePillActive,
+                          ]}
+                        >
+                          <div
+                            css={[
+                              styles.toggleThumb,
+                              queueInfo.autoplay_enabled &&
+                                styles.toggleThumbActive,
+                            ]}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {canSetCrossfade && (
+                      <div
+                        css={styles.switchRow}
+                        onClick={() => {
+                          if (!queueInfoUpdating) toggleCrossfade();
+                        }}
+                      >
+                        <span css={styles.switchLeft}>
+                          <Icon size="x-small" icon="mdi:waveform" />
+                          {t({
+                            id: "Settings.ma_crossfade",
+                            defaultMessage: "MA Queue Crossfade",
+                          })}
+                        </span>
+                        <div
+                          css={[
+                            styles.togglePill,
+                            queueInfo.crossfade_enabled &&
+                              styles.togglePillActive,
+                          ]}
+                        >
+                          <div
+                            css={[
+                              styles.toggleThumb,
+                              queueInfo.crossfade_enabled &&
+                                styles.toggleThumbActive,
+                            ]}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {(queueInfo.flow_mode ||
+                      queueInfo.smart_fades_active ||
+                      queueInfo.smart_shuffle_active ||
+                      (queueInfo.playback_speed &&
+                        queueInfo.playback_speed !== 1)) && (
+                      <div css={styles.badgeRow}>
+                        {queueInfo.flow_mode && (
+                          <span css={styles.statusBadge}>Flow Mode</span>
+                        )}
+                        {queueInfo.smart_fades_active && (
+                          <span css={styles.statusBadge}>Smart Fades</span>
+                        )}
+                        {queueInfo.smart_shuffle_active && (
+                          <span css={styles.statusBadge}>Smart Shuffle</span>
+                        )}
+                        {queueInfo.playback_speed &&
+                          queueInfo.playback_speed !== 1 && (
+                            <span css={styles.statusBadge}>
+                              Speed {queueInfo.playback_speed}x
+                            </span>
+                          )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div css={styles.statusBadge}>
+                    {t({
+                      id: "Settings.ma_no_active_queue",
+                      defaultMessage:
+                        "Start playback to configure Music Assistant queue options.",
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {numbers.length > 0 && (
               <div css={styles.section}>
                 <h4 css={styles.sectionTitle}>Equalizer & Levels</h4>
                 {numbers.map(num => {
-                  const val = parseFloat(num.state) || 0;
+                  const effectiveState =
+                    optimisticStates[num.entity_id] ?? num.state;
+                  const val = parseFloat(effectiveState) || 0;
                   const min = num.attributes.min ?? -10;
                   const max = num.attributes.max ?? 10;
                   const step = num.attributes.step ?? 1;
@@ -403,7 +599,9 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
                 <h4 css={styles.sectionTitle}>Audio Features</h4>
                 <div css={styles.switchGrid}>
                   {switches.map(sw => {
-                    const isOn = sw.state === "on";
+                    const effectiveState =
+                      optimisticStates[sw.entity_id] ?? sw.state;
+                    const isOn = effectiveState === "on";
                     const label = formatFriendlyName(
                       sw.attributes.friendly_name || sw.entity_id,
                       speakerName
@@ -414,7 +612,7 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
                       <div
                         key={sw.entity_id}
                         css={styles.switchRow}
-                        onClick={() => handleSwitchToggle(sw.entity_id)}
+                        onClick={() => handleSwitchToggle(sw.entity_id, isOn)}
                       >
                         <span css={styles.switchLeft}>
                           <Icon size="x-small" icon={icon} />
@@ -444,6 +642,8 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
               <div css={styles.section}>
                 <h4 css={styles.sectionTitle}>Audio Modes</h4>
                 {selects.map(sel => {
+                  const effectiveState =
+                    optimisticStates[sel.entity_id] ?? sel.state;
                   const label = formatFriendlyName(
                     sel.attributes.friendly_name || sel.entity_id,
                     speakerName
@@ -459,7 +659,7 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
                     <div key={sel.entity_id} css={styles.selectItem}>
                       <span css={styles.selectLabel}>{label}</span>
                       <Select
-                        value={sel.state}
+                        value={effectiveState}
                         options={options}
                         onChange={item =>
                           handleSelectChange(sel.entity_id, item.value)

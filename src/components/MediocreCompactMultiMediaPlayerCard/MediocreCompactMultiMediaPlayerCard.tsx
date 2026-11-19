@@ -15,6 +15,10 @@ import {
   AdditionalActionsMenu,
   AlbumArt,
   IconButton,
+  MassDiscoverProvider,
+  MassDiscoverSheet,
+  ToastBanner,
+  ToastProvider,
   useHass,
   usePlayer,
 } from "@components";
@@ -241,7 +245,7 @@ export const MediocreCompactMultiMediaPlayerCard = ({
 
   const CardElement = isEmbeddedInMultiCard ? "div" : "ha-card";
 
-  return (
+  const cardBody = (
     <CardElement
       style={{
         ...(artVars ?? {}),
@@ -393,5 +397,19 @@ export const MediocreCompactMultiMediaPlayerCard = ({
         )}
       </div>
     </CardElement>
+  );
+
+  if (isEmbeddedInMultiCard) {
+    return cardBody;
+  }
+
+  return (
+    <ToastProvider>
+      <MassDiscoverProvider>
+        {cardBody}
+        <MassDiscoverSheet mode="modal" />
+        <ToastBanner fixed />
+      </MassDiscoverProvider>
+    </ToastProvider>
   );
 };

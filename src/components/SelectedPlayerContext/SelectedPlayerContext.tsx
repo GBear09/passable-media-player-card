@@ -5,6 +5,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
 } from "preact/hooks";
 import { CardContext, CardContextType } from "@components/CardContext";
 import { useHass } from "@components/HassContext";
@@ -70,10 +71,13 @@ export const SelectedPlayerProvider = ({
     lastInteractionRef.current = Date.now();
   }, []);
 
+  const contextValue = useMemo(
+    () => ({ selectedPlayer, setSelectedPlayer, setLastInteraction }),
+    [selectedPlayer, setLastInteraction]
+  );
+
   return (
-    <SelectedPlayerContext.Provider
-      value={{ selectedPlayer, setSelectedPlayer, setLastInteraction }}
-    >
+    <SelectedPlayerContext.Provider value={contextValue}>
       <PlayerContextProvider
         entityId={selectedPlayer?.entity_id || config.entity_id}
       >

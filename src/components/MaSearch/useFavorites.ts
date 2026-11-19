@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { getHass } from "@utils";
+import { getConfigEntryId } from "@utils";
 import { getHassMessageWithCache } from "@utils/getHassMessageWithCache";
 import {
   MaFilterType,
@@ -9,34 +9,32 @@ import {
 } from "./types";
 import { responseKeyMediaTypeMap } from "./constants";
 
-export const useFavorites = (filter: MaFilterType, enabled: boolean) => {
-  const [configEntry, setConfigEntry] = useState(null);
+export const useFavorites = (
+  filter: MaFilterType,
+  enabled: boolean,
+  maEntityId?: string
+) => {
+  const [configEntry, setConfigEntry] = useState<string | null>(null);
   const [results, setResults] = useState<MaSearchResponse | null>();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const hass = getHass();
-    hass.callApi("GET", "config/config_entries/entry").then(entries => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const maEntries = (entries as any[]).filter(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (entry: any) => entry.domain === "music_assistant"
-      );
-      const entry = maEntries.find(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (entry: any) => entry.state === "loaded"
-      );
-      if (entry) {
-        setConfigEntry(entry.entry_id);
-      }
+    let active = true;
+    getConfigEntryId("music_assistant", maEntityId).then(entryId => {
+      if (active) setConfigEntry(entryId);
     });
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [maEntityId]);
 
   useEffect(() => {
     if (!configEntry || !enabled) {
       setResults(null);
+      setLoading(false);
       return;
     }
+    let cancelled = false;
     setLoading(true);
 
     const newResults: MaSearchResponse = {
@@ -77,25 +75,26 @@ export const useFavorites = (filter: MaFilterType, enabled: boolean) => {
           res.response.items ?? [];
       } catch (e) {
         console.error("Error fetching favorites:", mediaType, e);
-        return Promise.reject(e);
       }
     };
 
-    if (filter === "all") {
-      Promise.all(
-        Object.values(responseKeyMediaTypeMap).map(mediaType =>
-          getResult(mediaType)
-        )
-      ).then(() => {
+    const tasks =
+      filter === "all"
+        ? Object.values(responseKeyMediaTypeMap).map(mediaType =>
+            getResult(mediaType)
+          )
+        : [getResult(filter)];
+
+    Promise.allSettled(tasks).finally(() => {
+      if (!cancelled) {
         setLoading(false);
         setResults(newResults);
-      });
-    } else {
-      getResult(filter).then(() => {
-        setLoading(false);
-        setResults(newResults);
-      });
-    }
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [configEntry, filter, enabled]);
 
   return useMemo(() => ({ favorites: results, loading }), [results, loading]);

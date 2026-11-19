@@ -10,13 +10,13 @@ import {
 import { usePlayer } from "@components";
 import { getCssColorVariable, isDarkMode, parseColorToHsla } from "@utils";
 
-export function useArtworkColors() {
+export function useArtworkColors(enabled = true) {
   const {
     attributes: { entity_picture, entity_picture_local },
   } = usePlayer();
 
-  const albumArt = entity_picture_local || entity_picture;
-  const albumArtRef = useRef<string | undefined>(null);
+  const albumArt = enabled ? entity_picture_local || entity_picture : undefined;
+  const albumArtRef = useRef<string | undefined>(undefined);
   const colorTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // State for average color
@@ -26,6 +26,7 @@ export function useArtworkColors() {
 
   // Handle image load to calculate average color
   const getColors = useCallback(() => {
+    if (!enabled) return;
     if (albumArt && albumArt !== albumArtRef.current) {
       albumArtRef.current = albumArt;
       if (colorTimeoutRef.current) clearTimeout(colorTimeoutRef.current);
@@ -43,17 +44,20 @@ export function useArtworkColors() {
           });
       }, 800);
     }
-  }, [albumArt]);
+  }, [albumArt, enabled]);
 
-  // Reset average color when album art changes
+  // Reset average color when album art changes or is cleared
   useEffect(() => {
-    if (albumArt) {
+    if (enabled && albumArt) {
       getColors();
+    } else {
+      albumArtRef.current = undefined;
+      setPalette(null);
     }
     return () => {
       if (colorTimeoutRef.current) clearTimeout(colorTimeoutRef.current);
     };
-  }, [albumArt, getColors]);
+  }, [albumArt, enabled, getColors]);
 
   // Listen for dark mode changes
   useEffect(() => {

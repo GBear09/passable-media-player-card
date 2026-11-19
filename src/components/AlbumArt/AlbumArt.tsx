@@ -129,7 +129,7 @@ export const AlbumArt = ({
       setLoaded(true);
     };
 
-    img.src = getHass().hassUrl(url);
+    img.src = url.startsWith("data:") ? url : getHass().hassUrl(url);
     setImage(img);
 
     if (img.complete) {

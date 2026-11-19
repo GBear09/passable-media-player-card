@@ -2,7 +2,11 @@ import { getIconSize, Icon } from "@components/Icon";
 import { Spinner } from "@components/Spinner";
 import { fadeIn } from "@constants";
 import { css, keyframes } from "@emotion/react";
-import { getHass } from "@utils";
+import {
+  downloadAndEncodeMassImage,
+  getHass,
+  hasMassQueueDomain,
+} from "@utils";
 import { memo } from "preact/compat";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 
@@ -93,6 +97,24 @@ export const MediaImage = memo<MediaImageProps>(
           getImage(url, 1);
           return;
         }
+        if (
+          retries === 1 &&
+          typeof window !== "undefined" &&
+          window.location?.protocol === "https:" &&
+          url.startsWith("http://") &&
+          hasMassQueueDomain()
+        ) {
+          downloadAndEncodeMassImage(url).then(encoded => {
+            if (latestImageUrl.current !== url) return;
+            if (encoded) {
+              latestImageUrl.current = encoded;
+              getImage(encoded, 2);
+            } else {
+              setError(true);
+            }
+          });
+          return;
+        }
         setError(true);
       };
       img.onloadstart = () => {
@@ -111,7 +133,7 @@ export const MediaImage = memo<MediaImageProps>(
         setLoaded(true);
       };
 
-      img.src = getHass().hassUrl(url);
+      img.src = url.startsWith("data:") ? url : getHass().hassUrl(url);
       setImage(img);
     }, []);
 

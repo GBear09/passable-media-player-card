@@ -22,7 +22,13 @@ import { MassiveViewView } from "./components/MassiveView";
 import { AdditionalActionsView } from "./components/AdditionalActionsView";
 import { QueueView } from "./components/QueueView";
 import { useSelectedPlayer } from "@components/SelectedPlayerContext";
-import { SpeakerSettingsBottomSheet } from "@components";
+import {
+  MassDiscoverProvider,
+  MassDiscoverSheet,
+  SpeakerSettingsBottomSheet,
+  ToastBanner,
+  ToastProvider,
+} from "@components";
 
 export type NavigationRoute =
   | "search"
@@ -35,6 +41,7 @@ export type NavigationRoute =
 
 const styles = {
   root: css({
+    position: "relative",
     display: "grid",
     minHeight: 0,
     gridTemplateRows: "1fr auto",
@@ -201,87 +208,93 @@ export const MediocreLargeMultiMediaPlayerCard = ({
       ref={cardSizeRef}
       onClick={handleCardClick}
     >
-      {desktopMode ? (
-        <div
-          css={[
-            styles.contentArea,
-            styles.contentAreaDesktopMassive,
-            config.mode === "card" && styles.contentAreaCard,
-            config.options?.transparent_background_on_home &&
-              styles.contentAreaMassiveTransparent,
-            config.mode === "panel" &&
-              config.options?.transparent_background_on_home &&
-              styles.contentAreaMassiveTransparent,
-          ]}
-        >
-          <MassiveViewView
-            setNavigationRoute={setNavigationRoute}
-            navigationRoute={navigationRoute}
-          />
-        </div>
-      ) : null}
-      <div
-        css={[
-          styles.contentArea,
-          desktopMode && styles.contentAreaDesktop,
-          config.mode === "card" && styles.contentAreaCard,
-          navigationRoute === "massive" &&
-            config.options?.transparent_background_on_home &&
-            styles.contentAreaMassiveTransparent,
-          navigationRoute === "massive" &&
-            config.mode === "panel" &&
-            config.options?.transparent_background_on_home &&
-            styles.contentAreaMassiveTransparent,
-          config.mode === "in-card" && styles.contentAreaTransparent,
-        ]}
-        ref={contentSizeRef}
-      >
-        {navigationRoute === "search" && contentHeight && (
-          <SearchView height={contentHeight} />
-        )}
-        {navigationRoute === "media-browser" && contentHeight && (
-          <MediaBrowserView height={contentHeight} />
-        )}
-        {navigationRoute === "speaker-grouping" && <SpeakerGrouping />}
-        {navigationRoute === "queue" && contentHeight && (
-          <QueueView height={contentHeight} />
-        )}
-        {navigationRoute === "massive" && (
-          <MassiveViewView
-            setNavigationRoute={setNavigationRoute}
-            navigationRoute={navigationRoute}
-          />
-        )}
-        {navigationRoute === "custom-buttons" && <AdditionalActionsView />}
-      </div>
-      <div
-        css={[
-          styles.footer,
-          desktopMode && styles.footerDesktop,
-          config.mode === "card" && styles.footerCard,
-          config.mode === "in-card" && styles.footerInCard,
-        ]}
-      >
-        {!desktopMode &&
-          navigationRoute !== "massive" &&
-          cardHeight &&
-          cardHeight > 500 && (
-            <MiniPlayer
+      <ToastProvider>
+        <MassDiscoverProvider>
+          {desktopMode ? (
+            <div
+              css={[
+                styles.contentArea,
+                styles.contentAreaDesktopMassive,
+                config.mode === "card" && styles.contentAreaCard,
+                config.options?.transparent_background_on_home &&
+                  styles.contentAreaMassiveTransparent,
+                config.mode === "panel" &&
+                  config.options?.transparent_background_on_home &&
+                  styles.contentAreaMassiveTransparent,
+              ]}
+            >
+              <MassiveViewView
+                setNavigationRoute={setNavigationRoute}
+                navigationRoute={navigationRoute}
+              />
+            </div>
+          ) : null}
+          <div
+            css={[
+              styles.contentArea,
+              desktopMode && styles.contentAreaDesktop,
+              config.mode === "card" && styles.contentAreaCard,
+              navigationRoute === "massive" &&
+                config.options?.transparent_background_on_home &&
+                styles.contentAreaMassiveTransparent,
+              navigationRoute === "massive" &&
+                config.mode === "panel" &&
+                config.options?.transparent_background_on_home &&
+                styles.contentAreaMassiveTransparent,
+              config.mode === "in-card" && styles.contentAreaTransparent,
+            ]}
+            ref={contentSizeRef}
+          >
+            {navigationRoute === "search" && contentHeight && (
+              <SearchView height={contentHeight} />
+            )}
+            {navigationRoute === "media-browser" && contentHeight && (
+              <MediaBrowserView height={contentHeight} />
+            )}
+            {navigationRoute === "speaker-grouping" && <SpeakerGrouping />}
+            {navigationRoute === "queue" && contentHeight && (
+              <QueueView height={contentHeight} />
+            )}
+            {navigationRoute === "massive" && (
+              <MassiveViewView
+                setNavigationRoute={setNavigationRoute}
+                navigationRoute={navigationRoute}
+              />
+            )}
+            {navigationRoute === "custom-buttons" && <AdditionalActionsView />}
+          </div>
+          <div
+            css={[
+              styles.footer,
+              desktopMode && styles.footerDesktop,
+              config.mode === "card" && styles.footerCard,
+              config.mode === "in-card" && styles.footerInCard,
+            ]}
+          >
+            {!desktopMode &&
+              navigationRoute !== "massive" &&
+              cardHeight &&
+              cardHeight > 500 && (
+                <MiniPlayer
+                  setNavigationRoute={setNavigationRoute}
+                  navigationRoute={navigationRoute}
+                />
+              )}
+            <FooterActions
               setNavigationRoute={setNavigationRoute}
               navigationRoute={navigationRoute}
+              desktopMode={desktopMode}
+              onOpenSettings={() => setIsSettingsOpen(true)}
             />
-          )}
-        <FooterActions
-          setNavigationRoute={setNavigationRoute}
-          navigationRoute={navigationRoute}
-          desktopMode={desktopMode}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-        />
-      </div>
-      <SpeakerSettingsBottomSheet
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
+          </div>
+          <SpeakerSettingsBottomSheet
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+          />
+          <MassDiscoverSheet mode="embedded" />
+          <ToastBanner />
+        </MassDiscoverProvider>
+      </ToastProvider>
     </ArtworkColorWrap>
   );
 };

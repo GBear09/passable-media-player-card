@@ -157,6 +157,15 @@ export const MassivePopUp = ({
         show_volume_step_buttons: options?.show_volume_step_buttons,
         use_volume_up_down_for_step_buttons:
           options?.use_volume_up_down_for_step_buttons,
+        ...(options?.skip_controls
+          ? { skip_controls: options.skip_controls }
+          : {}),
+        ...(options?.skip_backward_seconds !== undefined
+          ? { skip_backward_seconds: options.skip_backward_seconds }
+          : {}),
+        ...(options?.skip_forward_seconds !== undefined
+          ? { skip_forward_seconds: options.skip_forward_seconds }
+          : {}),
       },
     };
   }, [config, entity_id]);

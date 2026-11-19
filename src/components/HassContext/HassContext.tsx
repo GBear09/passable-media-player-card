@@ -1,7 +1,7 @@
 import { HomeAssistant } from "@types";
 import { createContext } from "preact";
 import { memo } from "preact/compat";
-import { useContext } from "preact/hooks";
+import { useContext, useMemo } from "preact/hooks";
 
 export type HassContextType = {
   hass: HomeAssistant;
@@ -21,8 +21,11 @@ export const HassContextProvider = memo<
   }: HassContextType & {
     children: preact.ComponentChildren;
   }): preact.ComponentChildren => {
+    const contextValue = useMemo(() => ({ hass }), [hass]);
     return (
-      <HassContext.Provider value={{ hass }}>{children}</HassContext.Provider>
+      <HassContext.Provider value={contextValue}>
+        {children}
+      </HassContext.Provider>
     );
   }
 );

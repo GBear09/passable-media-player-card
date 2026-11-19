@@ -29,10 +29,10 @@ export class CardWrapper<
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const entityId =
         this.config?.entity_id ||
-        (this.config as any)?.media_players?.[0]?.entity_id;
+        (this.config as { media_players?: Array<{ entity_id: string }> })
+          ?.media_players?.[0]?.entity_id;
 
       const shouldRender =
         !this._previousHass ||

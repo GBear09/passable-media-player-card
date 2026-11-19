@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
-import { getHass } from "@utils";
+import { getConfigEntryId, getHass } from "@utils";
 import {
   MaEnqueueMode,
   MaFilterType,
@@ -8,26 +8,22 @@ import {
 } from "./types";
 import { useHassMessagePromise } from "@hooks/useHassMessagePromise";
 
-export const useSearchQuery = (debounceQuery: string, filter: MaFilterType) => {
-  const [configEntry, setConfigEntry] = useState(null);
+export const useSearchQuery = (
+  debounceQuery: string,
+  filter: MaFilterType,
+  maEntityId?: string
+) => {
+  const [configEntry, setConfigEntry] = useState<string | null>(null);
 
   useEffect(() => {
-    const hass = getHass();
-    hass.callApi("GET", "config/config_entries/entry").then(entries => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const maEntries = (entries as any[]).filter(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (entry: any) => entry.domain === "music_assistant"
-      );
-      const entry = maEntries.find(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (entry: any) => entry.state === "loaded"
-      );
-      if (entry) {
-        setConfigEntry(entry.entry_id);
-      }
+    let active = true;
+    getConfigEntryId("music_assistant", maEntityId).then(entryId => {
+      if (active) setConfigEntry(entryId);
     });
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [maEntityId]);
 
   const { data, loading } = useHassMessagePromise<MaSearchResponse>(
     {

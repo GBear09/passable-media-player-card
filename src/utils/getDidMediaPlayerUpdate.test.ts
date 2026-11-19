@@ -68,6 +68,40 @@ describe("getDidMediaPlayerUpdate", () => {
       expect(getDidMediaPlayerUpdate(prev, next)).toBe(true);
     });
 
+    it("detects media_position, media_position_updated_at, media_content_id, and active_queue changes", () => {
+      const prev = makeEntity();
+      expect(
+        getDidMediaPlayerUpdate(prev, {
+          ...prev,
+          attributes: { ...prev.attributes, media_position: 42 },
+        })
+      ).toBe(true);
+      expect(
+        getDidMediaPlayerUpdate(prev, {
+          ...prev,
+          attributes: {
+            ...prev.attributes,
+            media_position_updated_at: "2026-11-19T12:00:00Z",
+          },
+        })
+      ).toBe(true);
+      expect(
+        getDidMediaPlayerUpdate(prev, {
+          ...prev,
+          attributes: {
+            ...prev.attributes,
+            media_content_id: "library://track/99",
+          },
+        })
+      ).toBe(true);
+      expect(
+        getDidMediaPlayerUpdate(prev, {
+          ...prev,
+          attributes: { ...prev.attributes, active_queue: "queue_2" },
+        })
+      ).toBe(true);
+    });
+
     it("detects group_members array change", () => {
       const prev = makeEntity();
       const next = makeEntity({

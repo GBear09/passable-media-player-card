@@ -9,6 +9,10 @@ import {
 import { forwardRef } from "preact/compat";
 import { isDarkMode } from "@utils";
 import { ButtonSize, IconButton } from "@components";
+import {
+  OverlayMenu,
+  OverlayMenuItem,
+} from "@components/OverlayMenu/OverlayMenu";
 import { theme } from "@constants";
 
 const styles = {
@@ -99,11 +103,13 @@ export type MediaTrackProps = Omit<
   buttonIconSize?: ButtonSize;
   buttons?: {
     icon: string;
+    title?: string;
     onClick: () => void;
     disabled?: boolean;
     priority?: 1 | 2 | 3;
     size?: ButtonSize;
   }[];
+  actionsMenu?: OverlayMenuItem[];
 };
 
 export const MediaTrack = forwardRef<HTMLButtonElement, MediaTrackProps>(
@@ -116,6 +122,7 @@ export const MediaTrack = forwardRef<HTMLButtonElement, MediaTrackProps>(
       buttonIconSize = "x-small",
       onClick,
       buttons = [],
+      actionsMenu,
       ...buttonProps
     },
     ref
@@ -164,7 +171,7 @@ export const MediaTrack = forwardRef<HTMLButtonElement, MediaTrackProps>(
           <div css={styles.trackName}>{title}</div>
           {!!artist && <div css={styles.trackArtist}>{artist}</div>}
         </div>
-        {buttons.length > 0 && (
+        {(buttons.length > 0 || (actionsMenu && actionsMenu.length > 0)) && (
           <div css={styles.buttons}>
             {buttons.map((button, index) => (
               <IconButton
@@ -179,6 +186,8 @@ export const MediaTrack = forwardRef<HTMLButtonElement, MediaTrackProps>(
                 key={index + button.icon}
                 disabled={button.disabled}
                 icon={button.icon}
+                title={button.title}
+                aria-label={button.title}
                 onClick={e => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -191,6 +200,30 @@ export const MediaTrack = forwardRef<HTMLButtonElement, MediaTrackProps>(
                 size={button.size ?? buttonIconSize}
               />
             ))}
+            {actionsMenu && actionsMenu.length > 0 && (
+              <div
+                css={styles.button}
+                onClick={e => {
+                  e.stopPropagation();
+                }}
+              >
+                <OverlayMenu
+                  align="end"
+                  side="bottom"
+                  menuItems={actionsMenu}
+                  renderTrigger={triggerProps => (
+                    <IconButton
+                      icon="mdi:dots-vertical"
+                      type="button"
+                      size={buttonIconSize}
+                      title="More actions"
+                      aria-label="More actions"
+                      {...triggerProps}
+                    />
+                  )}
+                />
+              </div>
+            )}
           </div>
         )}
       </button>

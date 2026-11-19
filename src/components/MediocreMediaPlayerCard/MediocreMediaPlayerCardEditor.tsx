@@ -2,7 +2,7 @@ import { HomeAssistant, MediocreMediaPlayerCardConfigSchema } from "@types";
 import { MediocreMediaPlayerCardConfig } from "@types";
 import { useCallback, useEffect } from "preact/hooks";
 import { useStore, ValidationErrorMap } from "@tanstack/react-form";
-import { FormGroup, Label, SubForm } from "@components";
+import { FormGroup, FormSelect, Label, SubForm } from "@components";
 import { css } from "@emotion/react";
 import { FC } from "preact/compat";
 import {
@@ -256,6 +256,32 @@ export const MediocreMediaPlayerCardEditor: FC<
             <field.Toggle label="Use experimental LMS media browser (requires lyrion_cli integration)" />
           )}
         />
+        <form.Field name="options.skip_controls">
+          {field => (
+            <div
+              css={css({
+                display: "flex",
+                flexDirection: "row",
+                gap: 4,
+                alignItems: "center",
+                justifyContent: "space-between",
+              })}
+            >
+              <Label>Skip buttons (-15s / +30s):</Label>
+              <FormSelect
+                options={[
+                  { name: "Auto (Podcasts & long tracks)", value: "auto" },
+                  { name: "Always", value: "always" },
+                  { name: "Never", value: "never" },
+                ]}
+                onSelected={(value: string) =>
+                  field.handleChange(value as "auto" | "always" | "never")
+                }
+                selected={field.state.value || "auto"}
+              />
+            </div>
+          )}
+        </form.Field>
       </SubForm>
     </form.AppForm>
   );

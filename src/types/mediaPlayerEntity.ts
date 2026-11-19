@@ -54,7 +54,9 @@ export interface MediaPlayerEntityAttributes {
   device_class?: MediaPlayerDeviceClass;
   media_content_id?: string;
   media_content_type?: MediaContentType;
+  media_playlist?: string;
   mass_player_type?: string;
+  active_queue?: string;
   active_child?: string;
 }
 

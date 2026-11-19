@@ -44,6 +44,15 @@ export const getMultiConfigToMediocreMassiveConfig = (
         config.options?.use_volume_up_down_for_step_buttons ?? false,
       use_experimental_lms_media_browser:
         config.options?.use_experimental_lms_media_browser ?? false,
+      ...(config.options?.skip_controls
+        ? { skip_controls: config.options.skip_controls }
+        : {}),
+      ...(config.options?.skip_backward_seconds !== undefined
+        ? { skip_backward_seconds: config.options.skip_backward_seconds }
+        : {}),
+      ...(config.options?.skip_forward_seconds !== undefined
+        ? { skip_forward_seconds: config.options.skip_forward_seconds }
+        : {}),
     },
   };
 };

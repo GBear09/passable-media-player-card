@@ -15,6 +15,7 @@ interface SupportedFeatures {
   supportsTogglePlayPause: boolean;
   supportsPause: boolean;
   supportsStop: boolean;
+  supportsSeek: boolean;
 }
 
 /**
@@ -54,6 +55,9 @@ export function getSupportedFeatures(
     supportedFeatures !== undefined &&
     (supportedFeatures & 4096) === 4096;
 
+  const supportsSeek =
+    !isOff && supportedFeatures !== undefined && (supportedFeatures & 2) === 2;
+
   const canProbablyNotShuffleAndRepeat =
     !supportsStop && !supportsTogglePlayPause;
 
@@ -79,5 +83,6 @@ export function getSupportedFeatures(
     supportsTogglePlayPause,
     supportsPause,
     supportsStop,
+    supportsSeek,
   };
 }

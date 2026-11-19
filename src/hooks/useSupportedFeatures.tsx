@@ -1,22 +1,12 @@
 /* tslint:disable:no-bitwise */
-import { useHass, usePlayer } from "@components";
-import { useContext, useMemo } from "preact/hooks";
+import { useMemo } from "preact/hooks";
+import { usePlayer } from "@components";
 import { getSupportedFeatures } from "@utils/supportedFeaturesUtils";
-import { SelectedPlayerContext } from "@components/SelectedPlayerContext";
-import { getHasMassFeatures } from "@utils";
-import { MediaPlayerEntity } from "@types";
+import { useEffectiveMassPlayer } from "./useEffectiveMassPlayer";
 
 export function useSupportedFeatures() {
-  const { attributes, state, entity_id } = usePlayer();
-  const selectedPlayerContext = useContext(SelectedPlayerContext);
-  const selectedPlayer = selectedPlayerContext?.selectedPlayer;
-  const maEntityId = selectedPlayer?.ma_entity_id;
-
-  const hass = useHass();
-  const isMass = maEntityId ? getHasMassFeatures(entity_id, maEntityId) : false;
-  const maState = maEntityId
-    ? (hass?.states?.[maEntityId] as MediaPlayerEntity | undefined)
-    : undefined;
+  const { attributes, state } = usePlayer();
+  const { isMass, maState } = useEffectiveMassPlayer();
 
   const effectiveAttributes = useMemo(() => {
     if (isMass && maState) {
@@ -44,6 +34,7 @@ export function useSupportedFeatures() {
       supportedFeatures.supportsTogglePlayPause,
       supportedFeatures.supportsPause,
       supportedFeatures.supportsStop,
+      supportedFeatures.supportsSeek,
     ]
   );
 }
