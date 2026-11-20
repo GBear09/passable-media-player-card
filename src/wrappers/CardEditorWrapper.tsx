@@ -1,10 +1,8 @@
 import { FunctionComponent, render } from "preact";
 import { HomeAssistant } from "@types";
-import {
-  EmotionContextProvider,
-  GlanceGuard,
-  HassContextProvider,
-} from "@components";
+import { EmotionContextProvider } from "@components/EmotionContextProvider";
+import { GlanceGuard } from "@components/GlanceGuard";
+import { HassContextProvider } from "@components/HassContext";
 
 export type EditorCardProps<T> = {
   config: T;
@@ -17,18 +15,13 @@ export class CardEditorWrapper<T> extends HTMLElement {
   Card: FunctionComponent<EditorCardProps<T>> | null = null;
   extraProps: { [key: string]: unknown } = {};
   _hass: HomeAssistant | null = null;
+  private _isRendered = false;
 
-  disconnectedCallback() {
-    render(null, this);
-  }
+  private _render() {
+    if (!this.isConnected || !this._hass || !this.Card || !this._config) {
+      return;
+    }
 
-  set hass(hass: HomeAssistant) {
-    this._hass = hass;
-  }
-
-  setConfig(config: T) {
-    this._config = config;
-    if (!this._hass || !this.Card) return;
     render(
       <EmotionContextProvider rootElement={this}>
         <GlanceGuard>
@@ -44,5 +37,29 @@ export class CardEditorWrapper<T> extends HTMLElement {
       </EmotionContextProvider>,
       this
     );
+    this._isRendered = true;
+  }
+
+  connectedCallback() {
+    if (!this._isRendered) {
+      this._render();
+    }
+  }
+
+  disconnectedCallback() {
+    render(null, this);
+    this._isRendered = false;
+  }
+
+  set hass(hass: HomeAssistant) {
+    this._hass = hass;
+    if (!this._isRendered) {
+      this._render();
+    }
+  }
+
+  setConfig(config: T) {
+    this._config = config;
+    this._render();
   }
 }

@@ -1,7 +1,7 @@
 import createCache from "@emotion/cache";
 import { CacheProvider } from "@emotion/react";
 import { JSX } from "preact";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import "preact/debug";
 import "preact/devtools";
 import { memo } from "preact/compat";
@@ -16,6 +16,13 @@ export const EmotionContextProvider = memo<EmotionContextProviderProps>(
     const [emotionCache] = useState(() =>
       createCache({ key: "mmpc", container: rootElement, speedy: false })
     );
+
+    useEffect(() => {
+      return () => {
+        emotionCache.sheet.flush();
+      };
+    }, [emotionCache]);
+
     return <CacheProvider value={emotionCache}>{children}</CacheProvider>;
   }
 );

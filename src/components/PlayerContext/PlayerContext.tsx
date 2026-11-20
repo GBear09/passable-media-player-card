@@ -3,7 +3,7 @@ import { useContext, useMemo } from "preact/hooks";
 import { MediaPlayerEntity } from "@types";
 import { getMediaPlayerTitleAndSubtitle } from "@utils/getMediaPlayerTitleAndSubtitle";
 import { memo } from "preact/compat";
-import { useHass } from "@components";
+import { useHass } from "@components/HassContext";
 import { useIntl } from "@components/i18n";
 
 export type PlayerContextType = {
