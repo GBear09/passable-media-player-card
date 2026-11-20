@@ -32,3 +32,4 @@ export * from "./transferMaQueue";
 export * from "./startRadioMix";
 export * from "./massQueueClient";
 export * from "./playbackTimeUtils";
+export * from "./getSpeakerSettingsEntities";

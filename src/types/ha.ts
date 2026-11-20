@@ -3,13 +3,36 @@ import { HomeAssistant as CCHHomeAssistant } from "custom-card-helpers";
 import "preact";
 import { MediaPlayerEntity } from "@types";
 
+export type HassEntityRegistryDisplayEntry = {
+  entity_id: string;
+  name?: string;
+  icon?: string;
+  platform: string;
+  area_id?: string | null;
+  device_id?: string | null;
+  entity_category?: "config" | "diagnostic" | null;
+  hidden?: boolean;
+};
+
+export type HassDeviceRegistryEntry = {
+  id: string;
+  name?: string | null;
+  name_by_user?: string | null;
+  area_id?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  identifiers?: Array<[string, string]>;
+  via_device_id?: string | null;
+};
+
 export type HomeAssistant = Omit<
   CCHHomeAssistant,
   "states" | "selectedTheme"
 > & {
   hassUrl: (path: string) => string;
   selectedTheme?: { theme: string; dark: boolean } | null;
-  entities: { [entityId: string]: { entity_id: string; platform: string } };
+  entities: { [entityId: string]: HassEntityRegistryDisplayEntry };
+  devices?: { [deviceId: string]: HassDeviceRegistryEntry };
   states: CCHHomeAssistant["states"] & {
     [key: `media_player.${string}`]: MediaPlayerEntity | undefined;
   };

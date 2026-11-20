@@ -4,8 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "preact/hooks";
 import { Icon, IconButton, Select, Slider, useHass } from "@components";
 import { theme } from "@constants";
 import { useSelectedPlayer } from "@components/SelectedPlayerContext";
-import { getHass } from "@utils";
-import { HassEntity } from "home-assistant-js-websocket";
+import {
+  formatSpeakerSettingLabel,
+  getHass,
+  getSpeakerSettingsEntities,
+} from "@utils";
 import { useMassQueueInfo } from "@hooks";
 import { useIntl } from "@components/i18n";
 
@@ -247,13 +250,6 @@ function getSwitchIcon(entityId: string): string {
   return "mdi:toggle-switch";
 }
 
-function formatFriendlyName(name: string, prefix: string): string {
-  let cleaned = name;
-  const regex = new RegExp(`^${prefix}\\s*`, "i");
-  cleaned = cleaned.replace(regex, "");
-  return cleaned.trim() || name;
-}
-
 export type SpeakerSettingsBottomSheetProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -283,7 +279,7 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
     const speakerName = selectedPlayer?.name || "Speaker";
     const entityId = selectedPlayer?.entity_id || "";
     const maEntityId = selectedPlayer?.ma_entity_id;
-    const baseName = entityId.replace("media_player.", "").replace(/_ma$/, "");
+    const speakerGroupEntityId = selectedPlayer?.speaker_group_entity_id;
 
     const {
       queueInfo,
@@ -294,62 +290,34 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
       toggleCrossfade,
     } = useMassQueueInfo(maEntityId, isOpen && Boolean(maEntityId));
 
-    // Read fresh states from live hass when open so switch/number/select changes reflect immediately
-    const liveStates = useMemo(() => {
+    // Read fresh hass when open so switch/number/select changes and registry metadata reflect immediately
+    const liveHass = useMemo(() => {
       const currentHass = getHass();
-      return currentHass?.states ?? hass?.states;
+      return currentHass?.states ? currentHass : hass;
       // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshTick polls live entity state changes while open
-    }, [hass?.states, refreshTick]);
+    }, [hass, refreshTick]);
 
-    // Discover settings entities matching speaker
-    const { numbers, switches, selects } = useMemo(() => {
-      if (!liveStates || !baseName) {
-        return { numbers: [], switches: [], selects: [] };
-      }
+    const liveStates = liveHass?.states;
 
-      const allStates = Object.values(liveStates) as HassEntity[];
-      const speakerPattern = new RegExp(
-        `^(number|switch|select)\\.${baseName}_`,
-        "i"
-      );
+    // Discover settings entities matching the speaker device
+    const { numbers, switches, selects, deviceNames } = useMemo(
+      () =>
+        getSpeakerSettingsEntities(liveHass, {
+          entityId,
+          maEntityId,
+          speakerGroupEntityId,
+        }),
+      [liveHass, entityId, maEntityId, speakerGroupEntityId]
+    );
 
-      const foundNumbers: HassEntity[] = [];
-      const foundSwitches: HassEntity[] = [];
-      const foundSelects: HassEntity[] = [];
-
-      for (const entity of allStates) {
-        if (entity.state === "unavailable" || entity.state === "unknown")
-          continue;
-        if (speakerPattern.test(entity.entity_id)) {
-          if (entity.entity_id.startsWith("number.")) {
-            foundNumbers.push(entity);
-          } else if (entity.entity_id.startsWith("switch.")) {
-            foundSwitches.push(entity);
-          } else if (entity.entity_id.startsWith("select.")) {
-            foundSelects.push(entity);
-          }
-        }
-      }
-
-      // Sort numbers logically (bass, treble, balance, etc.)
-      foundNumbers.sort((a, b) =>
-        (a.attributes.friendly_name || "").localeCompare(
-          b.attributes.friendly_name || ""
-        )
-      );
-
-      foundSwitches.sort((a, b) =>
-        (a.attributes.friendly_name || "").localeCompare(
-          b.attributes.friendly_name || ""
-        )
-      );
-
-      return {
-        numbers: foundNumbers,
-        switches: foundSwitches,
-        selects: foundSelects,
-      };
-    }, [liveStates, baseName]);
+    const labelPrefixes = useMemo(
+      () => [
+        speakerName,
+        liveStates?.[entityId]?.attributes?.friendly_name,
+        ...deviceNames,
+      ],
+      [speakerName, liveStates, entityId, deviceNames]
+    );
 
     const handleNumberChange = useCallback(
       (numberEntityId: string, value: number) => {
@@ -558,9 +526,9 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
                   const max = num.attributes.max ?? 10;
                   const step = num.attributes.step ?? 1;
                   const unit = num.attributes.unit_of_measurement || "";
-                  const label = formatFriendlyName(
+                  const label = formatSpeakerSettingLabel(
                     num.attributes.friendly_name || num.entity_id,
-                    speakerName
+                    labelPrefixes
                   );
                   const icon = getNumberIcon(num.entity_id);
 
@@ -602,9 +570,9 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
                     const effectiveState =
                       optimisticStates[sw.entity_id] ?? sw.state;
                     const isOn = effectiveState === "on";
-                    const label = formatFriendlyName(
+                    const label = formatSpeakerSettingLabel(
                       sw.attributes.friendly_name || sw.entity_id,
-                      speakerName
+                      labelPrefixes
                     );
                     const icon = getSwitchIcon(sw.entity_id);
 
@@ -644,9 +612,9 @@ export const SpeakerSettingsBottomSheet = memo<SpeakerSettingsBottomSheetProps>(
                 {selects.map(sel => {
                   const effectiveState =
                     optimisticStates[sel.entity_id] ?? sel.state;
-                  const label = formatFriendlyName(
+                  const label = formatSpeakerSettingLabel(
                     sel.attributes.friendly_name || sel.entity_id,
-                    speakerName
+                    labelPrefixes
                   );
                   const options = (sel.attributes.options || []).map(
                     (opt: string) => ({
